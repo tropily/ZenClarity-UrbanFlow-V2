@@ -1,0 +1,61 @@
+# OS / Editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Python packaging
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDEs / Editor configs (keep repo clean)
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs
+*.log
+logs/
+.log/
+
+# dbt artifacts
+target/
+dbt_packages/
+dbt_modules/
+logs/dbt/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+
+# Local data / generated artifacts
+data/
+tmp/
+tmp_*/
+*.tmp
+
+# Lakehouse local data (we don't want giant raw files in git)
+lakehouse/raw/
+lakehouse/processed/
+lakehouse/streaming/
+lakehouse/validation/
+
+# Checkpoints, cache
+.cache/
+.ipynb_checkpoints/
