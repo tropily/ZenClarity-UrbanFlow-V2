@@ -1,4 +1,8 @@
 flowchart LR
+# Lakehouse Architecture (ZenClarity-UrbanFlow V2)
+
+```mermaid
+flowchart LR
 
   %% Sources
   subgraph SRC[Sources]
