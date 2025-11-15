@@ -9,6 +9,7 @@ See the full architecture diagram:
 
 ## Repository Structure
 
+'''
 .
 ├── README.md
 ├── dashboards
@@ -47,3 +48,4 @@ See the full architecture diagram:
     ├── benchmark
     ├── helpers
     └── streaming
+'''
