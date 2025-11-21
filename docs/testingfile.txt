@@ -1,2 +1,1 @@
-testing V1
-
+This is Version 1: The Basic Setup
