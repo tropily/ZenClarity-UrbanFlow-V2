@@ -11,7 +11,6 @@ from pyspark.sql import SparkSession, functions as F
 def _parse_optional_int(val: Optional[str]) -> Optional[int]:
     """
     Convert a CLI arg string to int or None.
-    Accepts: "5" -> 5, "None"/""/None -> None
     """
     if val is None:
         return None
@@ -49,13 +48,12 @@ CAB_TYPES = ["yellow", "green"]
 BUCKET = "teo-nyc-taxi"
 
 # Read from Glue table (processed layer)
-# Assumes EMR is configured to use AWS Glue Data Catalog as its Hive metastore
 SRC_TABLE = "teo_nyc_taxi_db.trip_data"
 
 # Iceberg tables in Glue catalog
-ICEBERG_TABLE_PROD = "glue_catalog.nyc_taxi_wh.trip_data"          # reference only (not written)
+ICEBERG_TABLE_PROD = "glue_catalog.nyc_taxi_wh.trip_data"
 
-# You can change this to a different EMR-only stage table if you want to keep Glue output separate
+# Stage table location
 ICEBERG_TABLE_STAGE = "glue_catalog.nyc_taxi_wh.trip_data_v2_stage"
 ICEBERG_STAGE_LOCATION = f"s3://{BUCKET}/warehouse/nyc_taxi_wh/trip_data_v2_stage"
 
@@ -67,9 +65,7 @@ ICEBERG_STAGE_LOCATION = f"s3://{BUCKET}/warehouse/nyc_taxi_wh/trip_data_v2_stag
 def build_spark() -> SparkSession:
     """
     Create a SparkSession on EMR with Glue Catalog + Iceberg configured.
-    Requires EMR cluster to have:
-      - AWS Glue Data Catalog configured as Hive metastore
-      - Iceberg runtime / jars available
+    (No change here, as Spark configs are now passed via spark-submit)
     """
     spark = (
         SparkSession.builder
@@ -95,6 +91,7 @@ def build_spark() -> SparkSession:
 
 
 def describe_slice() -> str:
+    # (No change here)
     if BACKFILL_DAY is not None and BACKFILL_MONTH is not None:
         return f"date={BACKFILL_YEAR:04d}-{BACKFILL_MONTH:02d}-{BACKFILL_DAY:02d}"
     if BACKFILL_MONTH is not None:
@@ -103,6 +100,7 @@ def describe_slice() -> str:
 
 
 def ensure_stage_table_exists(spark: SparkSession):
+    # (No change here)
     try:
         spark.table(ICEBERG_TABLE_STAGE).limit(1).collect()
         print(f"Stage table {ICEBERG_TABLE_STAGE} exists, proceeding with write.")
@@ -115,16 +113,16 @@ def ensure_stage_table_exists(spark: SparkSession):
         )
 
 
-def read_processed_for_cab_type(spark: SparkSession, cab_type: str):
+def read_processed_for_cab_type(spark: SparkSession):
     """
-    Read from Glue table teo_nyc_taxi_db.trip_data for a cab_type
-    and the configured BACKFILL_YEAR/BACKFILL_MONTH/BACKFILL_DAY.
+    OPTIMIZED: Reads from Glue table teo_nyc_taxi_db.trip_data for ALL CAB_TYPES
+    in a single pass, eliminating unionByName.
     """
     df = spark.table(SRC_TABLE)
 
-    # Base filters: cab_type, year
+    # Base filters: cab_type (using isin) and year
     df = df.filter(
-        (F.col("cab_type") == F.lit(cab_type)) &
+        (F.col("cab_type").isin(CAB_TYPES)) &
         (F.col("year") == F.lit(BACKFILL_YEAR))
     )
 
@@ -140,17 +138,14 @@ def read_processed_for_cab_type(spark: SparkSession, cab_type: str):
     df = df.filter(F.year("pickup_datetime") == BACKFILL_YEAR)
 
     print(
-        f"Read from {SRC_TABLE} for cab_type={cab_type}, "
-        f"year={BACKFILL_YEAR}, month={BACKFILL_MONTH}, day={BACKFILL_DAY}"
+        f"Reading from {SRC_TABLE} for all cab types in slice: {describe_slice()}"
     )
 
     return df
 
 
 def align_to_iceberg_schema(df, limit_rows: Optional[int] = None):
-    """
-    Align to nyc_taxi_wh.trip_data_v2_stage schema.
-    """
+    # (No change here, column alignment logic is correct)
     cols = df.columns
 
     # Possibly-missing columns with proper aliases
@@ -215,6 +210,9 @@ def align_to_iceberg_schema(df, limit_rows: Optional[int] = None):
 
 
 def write_to_stage(unified_df):
+    """
+    OPTIMIZED: Adds repartition to ensure optimal output file distribution.
+    """
     ordered_df = unified_df.select(
         "vendorid",
         "cab_type",
@@ -244,15 +242,14 @@ def write_to_stage(unified_df):
     print(f"Writing to Iceberg table {ICEBERG_TABLE_STAGE} via DataFrame writer")
     (
         ordered_df
+        .repartition(60) # <-- Added explicit repartition for controlled output files (3x vCPUs)
         .writeTo(ICEBERG_TABLE_STAGE)
-        .overwritePartitions()   # overwrite partitions that appear in this slice
+        .overwritePartitions()  # overwrite partitions that appear in this slice
     )
 
 
 def validate_slice_counts(spark: SparkSession):
-    """
-    Validation for the configured slice (year/month/day).
-    """
+    # (No change here)
     print(f"=== Validation for slice: {describe_slice()} ===")
 
     src_df = spark.table(SRC_TABLE).filter(
@@ -301,7 +298,7 @@ def validate_slice_counts(spark: SparkSession):
 
 
 # ==============================
-# 4. Main
+# 4. Main (Optimized)
 # ==============================
 
 def main():
@@ -315,17 +312,10 @@ def main():
     # 1) Ensure stage table exists
     ensure_stage_table_exists(spark)
 
-    # 2) Read from processed yellow & green for the configured slice
-    dfs = []
-    for cab in CAB_TYPES:
-        df_cab = read_processed_for_cab_type(spark, cab)
-        print(f"{cab}_proc schema:")
-        df_cab.printSchema()
-        dfs.append(df_cab)
-
-    unified_src = dfs[0]
-    for df_other in dfs[1:]:
-        unified_src = unified_src.unionByName(df_other)
+    # 2) Read from processed yellow & green for the configured slice (SINGLE OPTIMIZED READ)
+    unified_src = read_processed_for_cab_type(spark) 
+    print("unified_src schema:")
+    unified_src.printSchema()
 
     # 3) Align to Iceberg schema (stage table schema)
     aligned_df = align_to_iceberg_schema(unified_src, limit_rows=ROW_LIMIT)
@@ -335,7 +325,7 @@ def main():
     count = aligned_df.count()
     print("aligned_df count:", count)
 
-    # 4) Write to stage table
+    # 4) Write to stage table (uses repartition(60) inside write_to_stage)
     write_to_stage(aligned_df)
 
     print(f"Backfill into trip_data_v2_stage completed for slice: {describe_slice()}")
