@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: stg_trip_data
+    description: "Standardized NYC Taxi trip data (Iceberg-backed), cleaned for cross-engine use."
+    columns:
+      - name: vendor_id
+        description: "Taxi vendor ID from the raw feed."
+        tests:
+          - not_null
+
+      - name: cab_type
+        description: "Type of cab (yellow, green, fhv, etc.)"
+        tests:
+          - not_null
+
+      - name: pickup_datetime
+        description: "Trip pickup timestamp."
+        tests:
+          - not_null
+
+      - name: dropoff_datetime
+        description: "Trip dropoff timestamp."
+        tests:
+          - not_null
+
+      - name: pickup_location_id
+        description: "Pickup Taxi Zone ID."
+        tests:
+          - not_null
+
+      - name: dropoff_location_id
+        description: "Dropoff Taxi Zone ID."
+        tests:
+          - not_null
+
+      - name: total_amount
+        description: "Total charge for the trip."
+        tests:
+          - not_null
+
+      - name: ingestion_ts
+        description: "Ingestion timestamp from the Iceberg pipeline."
+        tests:
+          - not_null

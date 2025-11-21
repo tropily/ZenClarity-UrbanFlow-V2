@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: dim_taxi_zone
+    description: "Taxi zone dimension (one row per location)."
+    columns:
+      - name: location_id
+        description: "Taxi zone LocationID (PK)."
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_date
+    description: "Calendar date dimension for NYC Taxi analytics."
+    columns:
+      - name: date_key
+        description: "Primary key for the date dimension (DATE)."
+        tests:
+          - not_null
+          - unique
+
+  - name: fact_trip
+    description: "Trip-level fact table, enriched with pickup/dropoff zones."
+    columns:
+      - name: pickup_datetime
+        tests:
+          - not_null
+      - name: dropoff_datetime
+        tests:
+          - not_null
+      - name: total_amount
+        tests:
+          - not_null
+      - name: pickup_location_id
+        tests:
+          - relationships:
+              to: ref('dim_taxi_zone')
+              field: location_id
+              where: "pickup_location_id is not null"
+      - name: dropoff_location_id
+        tests:
+          - relationships:
+              to: ref('dim_taxi_zone')
+              field: location_id
+              where: "dropoff_location_id is not null"

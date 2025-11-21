@@ -1,0 +1,23 @@
+
+name: 'zenclarity_urbanflow'     
+version: '1.0.0'
+config-version: 2
+
+profile: zenclarity_urbanflow     
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]      
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+models:
+  zenclarity_urbanflow:
+    +materialized: view
+
+    staging:      { +schema: STG_NYC_TAXI,  +tags: ['staging'] }
+    intermediate: { +schema: INT_NYC_TAXI,  +tags: ['intermediate'] }
+    marts:        { +schema: MART_NYC_TAXI, +tags: ['marts'] }
+
+
