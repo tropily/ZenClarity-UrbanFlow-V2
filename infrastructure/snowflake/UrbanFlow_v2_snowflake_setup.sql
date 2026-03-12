@@ -90,15 +90,15 @@ CREATE OR REPLACE STORAGE INTEGRATION INTG_NYC_ICEBERG_S3
   TYPE                      = EXTERNAL_STAGE
   STORAGE_PROVIDER          = S3
   ENABLED                   = TRUE
-  STORAGE_AWS_ROLE_ARN      = 'arn:aws:iam::66713712****:role/teo_snowflake_iceberg_role'
-  STORAGE_ALLOWED_LOCATIONS = ('s3://teo-nyc-taxi/warehouse/');
+  STORAGE_AWS_ROLE_ARN      = 'arn:aws:iam::******:role/teo_snowflake_iceberg_role'
+  STORAGE_ALLOWED_LOCATIONS = ('s3://****/warehouse/');
 
 -- Run this to get the IAM principal values for the trust policy
 DESC INTEGRATION INTG_NYC_ICEBERG_S3;
 
 -- RECORD THESE VALUES AFTER RUNNING DESC:
--- STORAGE_AWS_IAM_USER_ARN : "arn:aws:iam::698719917574:user/h1i11000-s"
--- STORAGE_AWS_EXTERNAL_ID  : "FVC43135_SFCRole=3_6I8kHIOOnvdCpPJ/rw+zlcrNKJM="
+-- STORAGE_AWS_IAM_USER_ARN : "arn:aws:iam::***:user/****-s"
+-- STORAGE_AWS_EXTERNAL_ID  : "********"
 -- These go into the trust policy of teo_snowflake_iceberg_role in AWS IAM
 
 
@@ -130,8 +130,8 @@ DESC INTEGRATION INTG_NYC_ICEBERG_S3;
 CREATE OR REPLACE CATALOG INTEGRATION INTG_GLUE_NYC_ICEBERG
   CATALOG_SOURCE    = GLUE
   TABLE_FORMAT      = ICEBERG
-  GLUE_AWS_ROLE_ARN = 'arn:aws:iam::66713712****:role/teo_snowflake_iceberg_role'
-  GLUE_CATALOG_ID   = '66713712****'
+  GLUE_AWS_ROLE_ARN = 'arn:aws:iam::*****:role/teo_snowflake_iceberg_role'
+  GLUE_CATALOG_ID   = '*****'
   GLUE_REGION       = 'us-east-1'
   ENABLED           = TRUE
   COMMENT           = 'Glue catalog integration for NYC Taxi Iceberg tables';
@@ -162,7 +162,7 @@ DESC CATALOG INTEGRATION INTG_GLUE_NYC_ICEBERG;
 --   Preventing writes from Snowflake protects data integrity.
 --
 -- S3 PATH:
---   s3://teo-nyc-taxi/warehouse/nyc_taxi_wh/
+--   s3://*****/warehouse/nyc_taxi_wh/
 --   This is where Glue writes the Iceberg metadata + data files
 -- ============================================================
 
@@ -171,8 +171,8 @@ CREATE OR REPLACE EXTERNAL VOLUME EV_NYC_ICEBERG
     (
       NAME                     = 'nyc_taxi_wh_location'
       STORAGE_PROVIDER         = 'S3'
-      STORAGE_BASE_URL         = 's3://teo-nyc-taxi/warehouse/nyc_taxi_wh/'
-      STORAGE_AWS_ROLE_ARN     = 'arn:aws:iam::66713712****:role/teo_snowflake_iceberg_role'
+      STORAGE_BASE_URL         = 's3://****/warehouse/nyc_taxi_wh/'
+      STORAGE_AWS_ROLE_ARN     = 'arn:aws:iam::*******:role/teo_snowflake_iceberg_role'
       STORAGE_AWS_EXTERNAL_ID  = 'FVC43135_******'
     )
   )
