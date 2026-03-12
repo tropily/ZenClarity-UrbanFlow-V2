@@ -82,3 +82,6 @@ practice/
 # ── pycache in DAG folders ──────────────────────────────────
 iceberg_backfill_migration_framework/dags/__pycache__/
 orchestration/dags/__pycache__/
+
+# ── EMR Cluster Configs ─────────────────────────────────────
+infrastructure/emr/configs/
