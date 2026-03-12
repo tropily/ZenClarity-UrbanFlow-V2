@@ -1,0 +1,206 @@
+{
+    "Cluster": {
+        "Id": "j-22ZRGUCMNJC1J",
+        "Name": "emr_nyc_taxi_trip_data_process",
+        "Status": {
+            "State": "WAITING",
+            "StateChangeReason": {
+                "Message": "Cluster ready after last step completed."
+            },
+            "Timeline": {
+                "CreationDateTime": "2026-03-07T19:17:51.040000-08:00",
+                "ReadyDateTime": "2026-03-07T19:22:09.633000-08:00"
+            }
+        },
+        "Ec2InstanceAttributes": {
+            "Ec2KeyName": "teoNewec2_key",
+            "Ec2SubnetId": "subnet-00284431d8aebdc28",
+            "RequestedEc2SubnetIds": [
+                "subnet-00284431d8aebdc28"
+            ],
+            "Ec2AvailabilityZone": "us-east-1c",
+            "RequestedEc2AvailabilityZones": [],
+            "IamInstanceProfile": "Teo_EMR_EC2_InstanceProfile",
+            "EmrManagedMasterSecurityGroup": "sg-0176ed9d4670123f9",
+            "EmrManagedSlaveSecurityGroup": "sg-088e2ad36ab38e5bf"
+        },
+        "InstanceCollectionType": "INSTANCE_GROUP",
+        "LogUri": "s3n://teo-nyc-taxi/logs/",
+        "ReleaseLabel": "emr-7.7.0",
+        "AutoTerminate": false,
+        "TerminationProtected": false,
+        "UnhealthyNodeReplacement": true,
+        "VisibleToAllUsers": true,
+        "Applications": [
+            {
+                "Name": "Hadoop",
+                "Version": "3.4.0"
+            },
+            {
+                "Name": "Hive",
+                "Version": "3.1.3"
+            },
+            {
+                "Name": "Livy",
+                "Version": "0.8.0"
+            },
+            {
+                "Name": "Spark",
+                "Version": "3.5.3"
+            }
+        ],
+        "Tags": [],
+        "ServiceRole": "arn:aws:iam::667137120741:role/Teo_EMR_DefaultRole",
+        "NormalizedInstanceHours": 48,
+        "MasterPublicDnsName": "ec2-98-86-112-76.compute-1.amazonaws.com",
+        "Configurations": [
+            {
+                "Classification": "spark-hive-site",
+                "Properties": {
+                    "hive.metastore.client.factory.class": "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory"
+                }
+            },
+            {
+                "Classification": "hive-site",
+                "Properties": {
+                    "hive.metastore.client.factory.class": "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory"
+                }
+            }
+        ],
+        "ScaleDownBehavior": "TERMINATE_AT_TASK_COMPLETION",
+        "KerberosAttributes": {},
+        "ClusterArn": "arn:aws:elasticmapreduce:us-east-1:667137120741:cluster/j-22ZRGUCMNJC1J",
+        "StepConcurrencyLevel": 1,
+        "PlacementGroups": [],
+        "OSReleaseLabel": "2023.10.20260216.1",
+        "BootstrapActions": [
+            {
+                "Name": "Install boto3",
+                "ScriptPath": "s3://teo-nyc-taxi/scripts/install-boto3.sh",
+                "Args": []
+            }
+        ],
+        "InstanceGroups": [
+            {
+                "Id": "ig-1XQVJZ9QPHLVJ",
+                "Name": "Task - 1",
+                "Market": "ON_DEMAND",
+                "InstanceGroupType": "TASK",
+                "InstanceType": "m5.xlarge",
+                "RequestedInstanceCount": 1,
+                "RunningInstanceCount": 1,
+                "Status": {
+                    "State": "RUNNING",
+                    "StateChangeReason": {
+                        "Message": ""
+                    },
+                    "Timeline": {
+                        "CreationDateTime": "2026-03-07T19:17:51.056000-08:00",
+                        "ReadyDateTime": "2026-03-07T19:22:11.181000-08:00"
+                    }
+                },
+                "Configurations": [],
+                "ConfigurationsVersion": 0,
+                "LastSuccessfullyAppliedConfigurations": [],
+                "LastSuccessfullyAppliedConfigurationsVersion": 0,
+                "EbsBlockDevices": [
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 32
+                        },
+                        "Device": "/dev/sdb"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 32
+                        },
+                        "Device": "/dev/sdc"
+                    }
+                ],
+                "ShrinkPolicy": {}
+            },
+            {
+                "Id": "ig-1L7GZ4EK40VIS",
+                "Name": "Primary",
+                "Market": "ON_DEMAND",
+                "InstanceGroupType": "MASTER",
+                "InstanceType": "m5.xlarge",
+                "RequestedInstanceCount": 1,
+                "RunningInstanceCount": 1,
+                "Status": {
+                    "State": "RUNNING",
+                    "StateChangeReason": {
+                        "Message": ""
+                    },
+                    "Timeline": {
+                        "CreationDateTime": "2026-03-07T19:17:51.056000-08:00",
+                        "ReadyDateTime": "2026-03-07T19:20:51.954000-08:00"
+                    }
+                },
+                "Configurations": [],
+                "ConfigurationsVersion": 0,
+                "LastSuccessfullyAppliedConfigurations": [],
+                "LastSuccessfullyAppliedConfigurationsVersion": 0,
+                "EbsBlockDevices": [
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 32
+                        },
+                        "Device": "/dev/sdb"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 32
+                        },
+                        "Device": "/dev/sdc"
+                    }
+                ],
+                "ShrinkPolicy": {}
+            },
+            {
+                "Id": "ig-3PPH8WGFOIXG5",
+                "Name": "Core",
+                "Market": "ON_DEMAND",
+                "InstanceGroupType": "CORE",
+                "InstanceType": "m5.xlarge",
+                "RequestedInstanceCount": 1,
+                "RunningInstanceCount": 1,
+                "Status": {
+                    "State": "RUNNING",
+                    "StateChangeReason": {
+                        "Message": ""
+                    },
+                    "Timeline": {
+                        "CreationDateTime": "2026-03-07T19:17:51.056000-08:00",
+                        "ReadyDateTime": "2026-03-07T19:22:09.633000-08:00"
+                    }
+                },
+                "Configurations": [],
+                "ConfigurationsVersion": 0,
+                "LastSuccessfullyAppliedConfigurations": [],
+                "LastSuccessfullyAppliedConfigurationsVersion": 0,
+                "EbsBlockDevices": [
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 32
+                        },
+                        "Device": "/dev/sdb"
+                    },
+                    {
+                        "VolumeSpecification": {
+                            "VolumeType": "gp2",
+                            "SizeInGB": 32
+                        },
+                        "Device": "/dev/sdc"
+                    }
+                ],
+                "ShrinkPolicy": {}
+            }
+        ]
+    }
+}

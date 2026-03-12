@@ -59,3 +59,26 @@ lakehouse/validation/
 # Checkpoints, cache
 .cache/
 .ipynb_checkpoints/
+
+# ── IAM & Security ──────────────────────────────────────────
+# Trust policies contain AWS account IDs and principal ARNs
+# Applied to AWS IAM directly — files kept for reference only
+# Never commit to version control
+infrastructure/iam/
+trust_policy*.json
+
+# ── Scratch & Test Files ─────────────────────────────────────
+docs/teo_testing.txt
+derby.log
+
+# ── Airflow ─────────────────────────────────────────────────
+orchestration/.env
+orchestration/logs/
+orchestration/plugins/
+
+# ── Practice / Personal Notes ───────────────────────────────
+practice/
+
+# ── pycache in DAG folders ──────────────────────────────────
+iceberg_backfill_migration_framework/dags/__pycache__/
+orchestration/dags/__pycache__/
