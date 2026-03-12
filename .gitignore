@@ -85,3 +85,8 @@ orchestration/dags/__pycache__/
 
 # ── EMR Cluster Configs ─────────────────────────────────────
 infrastructure/emr/configs/
+
+# ── Local Deploy Scripts & Requirements ─────────────────────
+deploy.sh
+deploy_iceberg_migration_framework.sh
+requirement.txt
