@@ -79,26 +79,53 @@ LEGEND: ✓ Done | 🔧 In Progress | ⬡ Next | ○ Planned | ↓ Later
       3.5.5 list_failed_slices() — gap detection
       3.5.6 Document reset runbook
 
-4. Transformation — dbt V2 (⬡ Next)
-   4.1 Source Re-point
-      4.1.1 Update sources.yml to trip_data_v2_stage
-      4.1.2 Validate staging models compile against new source
-   4.2 Incremental Models
-      4.2.1 Add materialized="incremental" + unique_key to staging models
-      4.2.2 Add is_incremental() filter logic
-      4.2.3 Validate incremental run on top of full load
-   4.3 dbt Tests
-      4.3.1 Add schema tests (not_null, unique, accepted_values)
-      4.3.2 Add dbt-expectations tests (row counts, value ranges, null rates)
-      4.3.3 Add source freshness config (warn_after / error_after)
-   4.4 Airflow → dbt Wire
-      4.4.1 Add BashOperator: dbt run downstream of engine job success
-      4.4.2 Add BashOperator: dbt test after dbt run
-      4.4.3 Update DynamoDB audit — LANDED only when dbt tests pass
-   4.5 Validate End-to-End
-      4.5.1 Run full pipeline (DAG → Glue/EMR → dbt run → dbt test)
-      4.5.2 Compare mart row counts V1 vs V2
-      4.5.3 Document any variance
+SECTION 4 — dbt V2
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4.1 Source Re-point
+  4.1.1 ✓ sources.yml — confirmed correct, no changes needed
+  4.1.2 ✓ stg_trip_data.sql — 4 metadata cols added
+  4.1.3 ✓ stg_trip_data.yml — 8/8 tests passing
+  4.1.4 ✓ Snowflake connection confirmed
+         NYC_TAXI_DEV.STG_NYC_TAXI.stg_trip_data live
+
+4.2 Intermediate Layer  ← NEW SECTION
+  4.2.1 ✓ int_trip_data_core.sql
+         materialized=incremental
+         unique_key=trip_id
+         on_schema_change=sync_all_columns
+         SCD Type 1 — latest wins
+         surrogate key — immutable columns
+         quality filters — bad trips excluded
+         zone enrichment — pickup/dropoff zone + borough
+         trip_duration_minutes — derived metric
+         Running in INT_NYC_TAXI schema ✓
+
+  4.2.2 ✓ int_trip_data_quarantine.sql
+         materialized=view
+         live window of current bad records
+         array_construct_compact — multi-reason DQ flags
+         mirrors exact inverse of core filters
+
+  4.2.3 ✓ int_trip_zone_join.sql — DELETED
+         redundant — zone join consolidated into core
+
+  4.2.4 ⬡ int_trip_data_core.yml — tests not written yet
+         unique(trip_id)
+         not_null(trip_id, pickup_datetime, cab_type)
+         accepted_values(cab_type)
+         dbt test not run yet
+
+  4.2.5 ⬡ mart_fact_trip.sql — next build session
+         refs int_trip_data_core
+         aggregations + grain definition
+
+  4.2.6 ○ SCD Type 2 — parked for Session 3
+         dbt snapshots pattern
+         /snapshots folder structure
+         dbt_valid_from/to/is_current
+         dim_vendor + dim_location candidates
+         when snapshot vs incremental
+         how snapshots fit into Airflow DAG
 
 5. Snowflake Iceberg Integration (⬡ Next — after 4.5)
    5.1 Storage Integration
@@ -157,30 +184,40 @@ LEGEND: ✓ Done | 🔧 In Progress | ⬡ Next | ○ Planned | ↓ Later
    8.1 Update Streamlit to V2 mart layer
    8.2 Refresh QuickSight SPICE dataset to Snowflake / Redshift V2
 
-9. Interview Preparation (○ Planned — Ongoing)
-   9.1 Technical Mock Interviews
-      9.1.1 Airflow (DAG design, idempotency, failure handling)
-      9.1.2 dbt (incremental models, tests, SCD handling)
-      9.1.3 Apache Iceberg (schema evolution, time travel, partitioning,
-            physical file layout — gap identified today)
-      9.1.4 AWS (Glue vs EMR, Kinesis, cost optimisation)
-      9.1.5 System design (cost-aware pipeline, backfill strategy,
-            two-surface idempotency design)
-   9.2 Behavioural STAR Stories
-      9.2.1 Complex migration delivery (Teradata era + V2 now)
-      9.2.2 Performance optimisation (Glue 6 min → EMR 1.5 min)
-      9.2.3 Data quality / audit write failure scenario — today's story
-      9.2.4 Design trade-off: TTL vs permanent audit records
-      9.2.5 Simplification decision: dropped Layer 2 to ship faster
-   9.3 Python Coding Screen Prep (🔧 Priority — gap confirmed today)
-      9.3.1 boto3 patterns (DynamoDB get/put/batch/update)
-      9.3.2 List comprehensions + dict manipulation
-      9.3.3 Basic PySpark (filter / select / write to Iceberg)
-      9.3.4 Reading and modifying existing functions independently
-      9.3.5 Spotting bugs in code without running it first
-   9.4 Resume + LinkedIn
-      9.4.1 Add V2 project — both engines confirmed working
-      9.4.2 Add idempotency design pattern — day-granularity
-            DynamoDB audit with batch reads
-      9.4.3 Add benchmark numbers (Glue 6 min vs EMR 1.5 min)
-      9.4.4 Update before applying
+SECTION 9 — Interview Prep
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9.1.2 dbt — ADD these calibrated answers:
+  ✓ Materialization trade-off
+    view vs incremental vs table
+    view chaining = performance degradation
+    storage $23/TB vs compute credits
+    
+  ✓ Iceberg feature boundary
+    staging = handoff point
+    filter pushdown through view to Iceberg
+    int/mart = Snowflake native behavior
+    on_schema_change bridges the gap
+
+  ✓ Silver layer design decisions
+    quality filters in intermediate not staging
+    staging silent drop = no audit trail
+    quarantine = live DQ window
+    enrichment joins in silver not marts
+    surrogate key = immutable columns only
+
+  ✓ Surrogate key edge case
+    mutable columns = hash collision risk
+    pickup_datetime correction = new trip_id
+    immutable ingestion_ts anchors quarantine key
+
+  ✓ ETL → dbt parallel
+    Ab Initio dedup → intermediate SQL
+    UPSERT → dbt MERGE via unique_key
+    SCD Type 2 flag → dbt snapshots
+    logic in tool → logic in version-controlled SQL
+
+9.5 Metropolis Status  ← NEW
+  Grace contact — advocate confirmed
+  Timeline — no interview scheduled yet
+  Grace signal — will accelerate if offer received
+  Strategy — use extra time for SCD2 + mock drill

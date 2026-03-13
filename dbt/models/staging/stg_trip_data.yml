@@ -2,7 +2,8 @@ version: 2
 
 models:
   - name: stg_trip_data
-    description: "Standardized NYC Taxi trip data (Iceberg-backed), cleaned for cross-engine use."
+    description: "Standardized NYC Taxi trip data (Iceberg-backed), cleaned for cross-engine use. 
+                  V2 — includes pipeline metadata columns for full lineage traceability."
     columns:
       - name: vendor_id
         description: "Taxi vendor ID from the raw feed."
@@ -10,7 +11,7 @@ models:
           - not_null
 
       - name: cab_type
-        description: "Type of cab (yellow, green, fhv, etc.)"
+        description: "Type of cab (yellow, green, fhv, high_volume_fhv)."
         tests:
           - not_null
 
@@ -43,3 +44,28 @@ models:
         description: "Ingestion timestamp from the Iceberg pipeline."
         tests:
           - not_null
+
+      - name: batch_id
+        description: >
+          Pipeline run identifier — format: {engine}#{cab_type}#{yyyy}_{mm}_{dd}#{uuid8}.
+          Backfill: emr#green#2024_01_ALL#abc123.
+          Delta: glue#green#2025_01_ALL#xyz789.
+          Passed from Airflow DAG at runtime.
+      - name: source_file
+        description: "S3 path of the origin data file for lineage tracing.
+          Backfill: s3://****/processed/trip_data/cab_type=cab_type/year=year/
+          Delta: s3://****/raw/cab_type_tripdata_yyyy-mm.parquet"
+
+      - name: migration_batch_id
+        description: >
+          Distinguishes pipeline origin.
+          Backfill runs: same as batch_id.
+          Delta ingestion runs: 'delta_ingestion' literal.
+          Used for audit queries separating backfill vs ongoing ingestion.
+
+      - name: engine_type
+        description: >
+          Engine that wrote this record.
+          EMR Spark: 'EMR_7.7.0_MULTI_RES'.
+          AWS Glue: 'GLUE_4.0_NETPLAY'.
+          Consistent format across backfill and delta pipelines.

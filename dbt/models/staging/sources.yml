@@ -28,6 +28,10 @@ sources:
 
     tables:
       - name: trip_data
-
+        description: "UrbanFlow V2 — NYC Taxi trips via Glue Iceberg catalog. All cab types."
+ #        freshness:
+ #        warn_after:  {count: 24, period: hour}
+ #        error_after: {count: 48, period: hour}
+        loaded_at_field: ingestion_ts
       - name: taxi_zone_lookup
         description: "NYC taxi zone reference table with borough and service zone."
