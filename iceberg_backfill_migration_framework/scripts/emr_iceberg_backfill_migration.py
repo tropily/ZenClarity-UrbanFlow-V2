@@ -122,6 +122,10 @@ def run_emr_job(session, batch_id):
         raw_df     = spark.read.parquet(S3_PATH)
         aligned_df = align_to_iceberg_schema(raw_df, batch_id)
 
+        # Repartition before write — eliminates small file problem
+        # 60 partitions balanced for m5.xlarge cluster at 42M records
+        aligned_df = aligned_df.repartition(60)
+
         record_count = aligned_df.count()
         print(f"🔥 Landing {record_count} records → {ICEBERG_TABLE_STAGE}")
 
