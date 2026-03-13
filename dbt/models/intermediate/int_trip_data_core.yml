@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: int_trip_data_core
+    description: >
+      Silver layer — quality filtered, zone enriched, keyed NYC Taxi trips.
+      SCD Type 1 incremental model. Bad records routed to int_trip_data_quarantine.
+
+    columns:
+
+      - name: trip_id
+        description: "Surrogate key — hash of vendor_id, cab_type, pickup_datetime, pickup_location_id, dropoff_location_id"
+        tests:
+          - unique
+          - not_null
+
+      - name: cab_type
+        description: "Taxi cab type — yellow, green, fhv, high_volume_fhv"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['yellow', 'green', 'fhv', 'high_volume_fhv']
+
+      - name: vendor_id
+        tests:
+          - not_null
+
+      - name: pickup_datetime
+        tests:
+          - not_null
+
+      - name: dropoff_datetime
+        tests:
+          - not_null
+
+      - name: total_amount
+        description: "Total fare amount — always positive (quality filter applied)"
+        tests:
+          - not_null
+
+      - name: trip_duration_minutes
+        description: "Derived — datediff minutes between pickup and dropoff"
+        tests:
+          - not_null
+
+      - name: ingestion_ts
+        tests:
+          - not_null

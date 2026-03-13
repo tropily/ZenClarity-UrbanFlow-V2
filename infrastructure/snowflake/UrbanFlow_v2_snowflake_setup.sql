@@ -173,7 +173,7 @@ CREATE OR REPLACE EXTERNAL VOLUME EV_NYC_ICEBERG
       STORAGE_PROVIDER         = 'S3'
       STORAGE_BASE_URL         = 's3://****/warehouse/nyc_taxi_wh/'
       STORAGE_AWS_ROLE_ARN     = 'arn:aws:iam::*******:role/teo_snowflake_iceberg_role'
-      STORAGE_AWS_EXTERNAL_ID  = 'FVC43135_******'
+      STORAGE_AWS_EXTERNAL_ID  = '*******'
     )
   )
   ALLOW_WRITES = FALSE;  -- Snowflake is read-only. Glue/EMR own all writes.

@@ -20,26 +20,55 @@ models:
           - unique
 
   - name: fact_trip
-    description: "Trip-level fact table, enriched with pickup/dropoff zones."
+    description: >
+      Gold layer — trip fact table with pre-computed business metrics.
+      Incremental model sourced from int_trip_data_core.
+      Includes tip_pct, time_of_day buckets, and airport trip flag.
     columns:
+      - name: trip_id
+        description: "Surrogate key — inherited from int_trip_data_core."
+        tests:
+          - not_null
+          - unique
+
+      - name: cab_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['yellow', 'green', 'fhv', 'high_volume_fhv']
+
       - name: pickup_datetime
         tests:
           - not_null
+
       - name: dropoff_datetime
         tests:
           - not_null
+
       - name: total_amount
         tests:
           - not_null
+
+      - name: trip_duration_minutes
+        tests:
+          - not_null
+
+      - name: ingestion_ts
+        tests:
+          - not_null
+
       - name: pickup_location_id
         tests:
           - relationships:
-              to: ref('dim_taxi_zone')
-              field: location_id
+              arguments:
+                to: ref('dim_taxi_zone')
+                field: location_id
               where: "pickup_location_id is not null"
+
       - name: dropoff_location_id
         tests:
           - relationships:
-              to: ref('dim_taxi_zone')
-              field: location_id
+              arguments:
+                to: ref('dim_taxi_zone')
+                field: location_id
               where: "dropoff_location_id is not null"
