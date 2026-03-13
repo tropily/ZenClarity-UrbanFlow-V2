@@ -108,6 +108,70 @@ to showcase the routing logic across all slice granularities (day / month / year
 ## 🗺️ Architecture
 ![Architecture Diagram](docs/arch_diagrams/ZenClarity-UrbanFlow_architecture.jpg)
 
+## 🏗️ V2 Architecture — Migration Framework
+## 🏗️ V2 Architecture — Migration Framework
+```mermaid
+graph TD
+    S3[("📦 S3 Raw Parquet\ns3://teo-nyc-taxi/raw/\ncab_type · year · month · day")]
+
+    S3 --> DAG
+
+    subgraph DAG["⚙️ Airflow DAG — engine_volumetric_router"]
+        G1["🔒 Gate 1 — DynamoDB Idempotency\nExpand slice → day-level keys\nBatch read 100 keys/call\nAll LANDED → safe exit"]
+        G2["📊 Gate 2 — S3 Volumetric Scan\nSize scan → engine selection\nEmpty slice → safe exit"]
+        G1 --> G2
+    end
+
+    G2 -->|"Above threshold\nEMR Heavy Serve 🔥"| EMR
+    G2 -->|"Below threshold\nGlue Net Play ☁️"| GLUE
+    G2 -->|"Empty slice"| EXIT[🛑 Safe Exit]
+
+    subgraph ENGINES["🚀 Compute Engines"]
+        EMR["EMR Spark 7.7.0\nrepartition·60\nLarge payloads\nHigh parallelism"]
+        GLUE["AWS Glue 4.0\nServerless ETL\nSmall-medium payloads\nZero cluster overhead"]
+    end
+
+    EMR --> AUDIT
+    GLUE --> AUDIT
+
+    AUDIT[("📝 DynamoDB Audit\nwrite_audit_landed\nstatus = LANDED\nretries=3 · permanent")]
+
+    AUDIT --> ICE
+
+    subgraph ICE["🧊 Apache Iceberg · S3 + Glue Catalog"]
+        ICETBL["nyc_taxi_wh.trip_data\nPartitioned: day·pickup_datetime\n26 cols · zstd · ACID\nTime travel · Schema evolution"]
+    end
+
+    ICE --> SF
+
+    subgraph SF["❄️ Snowflake"]
+        SFTBL["NYC_TAXI_DEV\nRAW_ICEBERG.TRIP_DATA\nExternal Iceberg Table"]
+    end
+
+    SF --> DBT
+
+    subgraph DBT["🔧 dbt Medallion Stack"]
+        BRONZE["BRONZE — STG_NYC_TAXI\nstg_trip_data · view · 8 tests\nstg_taxi_zone_lookup · view"]
+        SILVER["SILVER — INT_NYC_TAXI\nint_trip_data_core · incremental · 10 tests\nint_trip_data_quarantine · view\nint_trip_data_dq_duplicates · view"]
+        GOLD["GOLD — MART_NYC_TAXI\nfact_trip · incremental · 35.6M records\ndim_taxi_zone · dim_date\ndq_trip_issue_summary · view"]
+        BRONZE --> SILVER --> GOLD
+    end
+
+    GOLD --> BI["📊 BI + Analytics\nStreamlit Dashboard\nQuickSight · planned"]
+```
+
+> ⚠️ **Engine Routing Threshold Note:**
+> The volumetric threshold shown above is **configurable and environment-specific** —
+> not a fixed boundary. AWS Glue 4.0 is a capable, production-grade engine
+> suitable for large workloads. The routing decision accounts for:
+> - EMR cluster spin-up overhead vs Glue's serverless startup
+> - DPU pricing vs EMR instance cost at target data volumes
+> - Workload shape — shuffle-heavy jobs favor EMR; simple scans favor Glue
+>
+> In this benchmark, the crossover was observed at ~0.05 GB for our specific
+> cluster configuration and workload. **Production thresholds must be calibrated
+> against your own cost model and data volumes.**
+
 ---
 
 ## 🌐 Portability — One dbt Codebase → Three Engines
@@ -178,8 +242,10 @@ ZenClarity-UrbanFlow-V2/
 │  ├─ models/
 │  │  ├─ staging/                          ← Bronze layer
 │  │  │  ├─ stg_trip_data.sql
-│  │  │  └─ sources.yml
+│  │  │  └─ stg_taxi_zone_lookup.sql
+│  │  │  └─ sources.yml  
 │  │  ├─ intermediate/                     ← Silver layer
+│  │  │  ├─ int_taxi_zone_lookup.sql
 │  │  │  ├─ int_trip_data_core.sql
 │  │  │  ├─ int_trip_data_quarantine.sql
 │  │  │  └─ int_trip_data_dq_duplicates.sql
@@ -220,6 +286,8 @@ ZenClarity-UrbanFlow-V2/
 
 **Bronze — Staging (`STG_NYC_TAXI`)**
 - `stg_trip_data` — view · 1:1 with Iceberg source · cast + rename only · 8 tests passing
+- `stg_taxi_zone_lookup` — view · 1:1 with Iceberg source · cast + rename only · 
+
 
 **Silver — Intermediate (`INT_NYC_TAXI`)**
 - `int_trip_data_core` — incremental table · quality filtered · deduped on `dropoff_datetime` · zone enriched · surrogate keyed · 10 tests passing
