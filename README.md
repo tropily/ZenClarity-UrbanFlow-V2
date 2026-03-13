@@ -107,57 +107,56 @@ to showcase the routing logic across all slice granularities (day / month / year
 
 ## 🗺️ Architecture
 ![Architecture Diagram](docs/arch_diagrams/ZenClarity-UrbanFlow_architecture.jpg)
+## 🏗️ V2 Architecture — Migration Framework
 
-## 🏗️ V2 Architecture — Migration Framework
-## 🏗️ V2 Architecture — Migration Framework
 ```mermaid
 graph TD
-    S3[("📦 S3 Raw Parquet\ns3://teo-nyc-taxi/raw/\ncab_type · year · month · day")]
+    S3[("S3 Raw Parquet")]
 
     S3 --> DAG
 
-    subgraph DAG["⚙️ Airflow DAG — engine_volumetric_router"]
-        G1["🔒 Gate 1 — DynamoDB Idempotency\nExpand slice → day-level keys\nBatch read 100 keys/call\nAll LANDED → safe exit"]
-        G2["📊 Gate 2 — S3 Volumetric Scan\nSize scan → engine selection\nEmpty slice → safe exit"]
+    subgraph DAG["Airflow DAG — engine_volumetric_router"]
+        G1["Gate 1 — DynamoDB Idempotency Check"]
+        G2["Gate 2 — S3 Volumetric Scan"]
         G1 --> G2
     end
 
-    G2 -->|"Above threshold\nEMR Heavy Serve 🔥"| EMR
-    G2 -->|"Below threshold\nGlue Net Play ☁️"| GLUE
-    G2 -->|"Empty slice"| EXIT[🛑 Safe Exit]
+    G2 -->|"Above threshold"| EMR
+    G2 -->|"Below threshold"| GLUE
+    G2 -->|"Empty slice"| EXIT[Safe Exit]
 
-    subgraph ENGINES["🚀 Compute Engines"]
-        EMR["EMR Spark 7.7.0\nrepartition·60\nLarge payloads\nHigh parallelism"]
-        GLUE["AWS Glue 4.0\nServerless ETL\nSmall-medium payloads\nZero cluster overhead"]
+    subgraph ENGINES["Compute Engines"]
+        EMR["EMR Spark 7.7.0"]
+        GLUE["AWS Glue 4.0"]
     end
 
     EMR --> AUDIT
     GLUE --> AUDIT
 
-    AUDIT[("📝 DynamoDB Audit\nwrite_audit_landed\nstatus = LANDED\nretries=3 · permanent")]
+    AUDIT[("DynamoDB Audit\nstatus = LANDED")]
 
     AUDIT --> ICE
 
-    subgraph ICE["🧊 Apache Iceberg · S3 + Glue Catalog"]
-        ICETBL["nyc_taxi_wh.trip_data\nPartitioned: day·pickup_datetime\n26 cols · zstd · ACID\nTime travel · Schema evolution"]
+    subgraph ICE["Apache Iceberg — S3 + Glue Catalog"]
+        ICETBL["nyc_taxi_wh.trip_data\nday partitioned · zstd · ACID"]
     end
 
     ICE --> SF
 
-    subgraph SF["❄️ Snowflake"]
-        SFTBL["NYC_TAXI_DEV\nRAW_ICEBERG.TRIP_DATA\nExternal Iceberg Table"]
+    subgraph SF["Snowflake"]
+        SFTBL["NYC_TAXI_DEV — RAW_ICEBERG.TRIP_DATA"]
     end
 
     SF --> DBT
 
-    subgraph DBT["🔧 dbt Medallion Stack"]
-        BRONZE["BRONZE — STG_NYC_TAXI\nstg_trip_data · view · 8 tests\nstg_taxi_zone_lookup · view"]
-        SILVER["SILVER — INT_NYC_TAXI\nint_trip_data_core · incremental · 10 tests\nint_trip_data_quarantine · view\nint_trip_data_dq_duplicates · view"]
-        GOLD["GOLD — MART_NYC_TAXI\nfact_trip · incremental · 35.6M records\ndim_taxi_zone · dim_date\ndq_trip_issue_summary · view"]
+    subgraph DBT["dbt Medallion Stack"]
+        BRONZE["BRONZE — stg_trip_data · stg_taxi_zone_lookup"]
+        SILVER["SILVER — int_trip_data_core · quarantine · dq_duplicates"]
+        GOLD["GOLD — fact_trip 35.6M · dim_taxi_zone · dim_date"]
         BRONZE --> SILVER --> GOLD
     end
 
-    GOLD --> BI["📊 BI + Analytics\nStreamlit Dashboard\nQuickSight · planned"]
+    GOLD --> BI["BI Layer — Streamlit · QuickSight"]
 ```
 
 > ⚠️ **Engine Routing Threshold Note:**
