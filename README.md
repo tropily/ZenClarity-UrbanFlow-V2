@@ -107,56 +107,24 @@ to showcase the routing logic across all slice granularities (day / month / year
 
 ## 🗺️ Architecture
 ![Architecture Diagram](docs/arch_diagrams/ZenClarity-UrbanFlow_architecture.jpg)
-## 🏗️ V2 Architecture — Migration Framework
+**V2 Architecture — Iceberg Migration Framework**
 
 ```mermaid
 graph TD
-    S3[("S3 Raw Parquet")]
-
-    S3 --> DAG
-
-    subgraph DAG["Airflow DAG — engine_volumetric_router"]
-        G1["Gate 1 — DynamoDB Idempotency Check"]
-        G2["Gate 2 — S3 Volumetric Scan"]
-        G1 --> G2
-    end
-
-    G2 -->|"Above threshold"| EMR
-    G2 -->|"Below threshold"| GLUE
-    G2 -->|"Empty slice"| EXIT[Safe Exit]
-
-    subgraph ENGINES["Compute Engines"]
-        EMR["EMR Spark 7.7.0"]
-        GLUE["AWS Glue 4.0"]
-    end
-
-    EMR --> AUDIT
-    GLUE --> AUDIT
-
-    AUDIT[("DynamoDB Audit\nstatus = LANDED")]
-
-    AUDIT --> ICE
-
-    subgraph ICE["Apache Iceberg — S3 + Glue Catalog"]
-        ICETBL["nyc_taxi_wh.trip_data\nday partitioned · zstd · ACID"]
-    end
-
-    ICE --> SF
-
-    subgraph SF["Snowflake"]
-        SFTBL["NYC_TAXI_DEV — RAW_ICEBERG.TRIP_DATA"]
-    end
-
-    SF --> DBT
-
-    subgraph DBT["dbt Medallion Stack"]
-        BRONZE["BRONZE — stg_trip_data · stg_taxi_zone_lookup"]
-        SILVER["SILVER — int_trip_data_core · quarantine · dq_duplicates"]
-        GOLD["GOLD — fact_trip 35.6M · dim_taxi_zone · dim_date"]
-        BRONZE --> SILVER --> GOLD
-    end
-
-    GOLD --> BI["BI Layer — Streamlit · QuickSight"]
+    S3[S3 Raw Parquet] --> G1
+    G1[Gate 1 DynamoDB Idempotency] --> G2
+    G2[Gate 2 S3 Volumetric Scan] --> EMR
+    G2 --> GLUE
+    G2 --> EXIT[Safe Exit]
+    EMR[EMR Spark 7.7.0] --> AUDIT
+    GLUE[AWS Glue 4.0] --> AUDIT
+    AUDIT[DynamoDB Audit LANDED] --> ICE
+    ICE[Apache Iceberg S3 Glue Catalog] --> SF
+    SF[Snowflake RAW ICEBERG] --> BRONZE
+    BRONZE[BRONZE stg trip data] --> SILVER
+    SILVER[SILVER int trip data core] --> GOLD
+    GOLD[GOLD fact trip 35.6M records] --> BI
+    BI[Streamlit Dashboard]
 ```
 
 > ⚠️ **Engine Routing Threshold Note:**
