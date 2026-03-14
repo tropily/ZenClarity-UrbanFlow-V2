@@ -1,307 +1,344 @@
-# Iceberg Migration Plan — 2024 Backfill (ZenClarity-UrbanFlow V2)
+# Iceberg Migration Runbook — 2024 Backfill (ZenClarity-UrbanFlow V2)
 
-**Owner:** Nguyen Le  
-**Scope:** Migrate 2024 *yellow* + *green* taxi trip data from processed zone → Iceberg warehouse staging table (`trip_data_v2_stage`), validate, then promote to production (`trip_data`).  
-**Purpose:** Establish a safe, deterministic, auditable migration workflow for Iceberg-based lakehouse tables.
-
----
-
-# 1. Architecture Overview
-
-```
-processed (Parquet, partitioned)
-    ↓
-Spark Backfill Job (schema normalize + partition filter + ingestion_ts)
-    ↓
-Iceberg Staging Table (trip_data_v2_stage)
-    ↓
-Validation Suite
-    ↓
-Promotion → Production Iceberg Table (trip_data)
-```
+**Owner:** Nguyen Le
+**Last Updated:** March 2026
+**Scope:** Migrate 2024 NYC Taxi trip data (all 4 cab types) from processed zone
+→ Iceberg warehouse staging table (`trip_data_v2_stage`), validate,
+then promote to production (`trip_data`).
+**Status:** ✅ Phase 1 Complete — 42M records migrated and validated
 
 ---
 
-# 2. Source → Destination Definition
-
-## 2.1 Source Dataset
-
-We are ingesting from the **processed zone**.
-
-### Processed S3 Layout (partitioned)
+## 1. Architecture Overview
 
 ```
-s3://teo-nyc-taxi/processed/trip_data/cab_type=yellow/year=2024/month=5/day=16/part-xxxx.snappy.parquet
-s3://teo-nyc-taxi/processed/trip_data/cab_type=green/year=2024/month=8/day=20/part-xxxx.snappy.parquet
+S3 Processed Zone (Parquet, partitioned by cab_type/year/month/day)
+    ↓
+Airflow DAG — engine_volumetric_router
+    ├─ Gate 1: DynamoDB Idempotency Check
+    └─ Gate 2: S3 Volumetric Scan → EMR or Glue
+         ↓                ↓
+    EMR Spark 7.7.0   AWS Glue 4.0
+    repartition(60)   Serverless
+         ↓                ↓
+    Schema Alignment — align_to_iceberg_schema()
+         ↓
+    Iceberg Staging Table — trip_data_v2_stage
+         ↓
+    DynamoDB Audit Write — status = LANDED
+         ↓
+    Validation Suite
+         ↓
+    Promotion → Production Iceberg Table — trip_data
+         ↓
+    Snowflake External Iceberg Table
+         ↓
+    dbt Medallion Stack (staging → intermediate → marts)
 ```
-
-### Source Table Schema (Glue External Table)
-
-- vendorid  
-- pickup_datetime  
-- dropoff_datetime  
-- store_and_fwd_flag  
-- ratecodeid  
-- pulocationid  
-- dolocationid  
-- passenger_count  
-- trip_distance  
-- fare_amount  
-- extra  
-- mta_tax  
-- tip_amount  
-- tolls_amount  
-- ehail_fee  
-- improvement_surcharge  
-- total_amount  
-- payment_type  
-- trip_type  
-- congestion_surcharge  
-- airport_fee  
-- partition columns: **cab_type, year, month, day**
-
-Partition columns become normal DataFrame columns on read.
 
 ---
 
-## 2.2 Destination: Production Iceberg Table
+## 2. Source → Destination Definition
+
+### 2.1 Source — S3 Processed Zone
 
 ```
-nyc_taxi_wh.trip_data
-LOCATION: s3://teo-nyc-taxi/warehouse/nyc_taxi_wh/trip_data
+s3://****/processed/trip_data/
+  cab_type=yellow/year=2024/month=1/day=1/part-xxxx.snappy.parquet
+  cab_type=green/year=2024/month=1/day=1/part-xxxx.snappy.parquet
+  cab_type=fhv/year=2024/month=1/day=1/part-xxxx.snappy.parquet
+  cab_type=high_volume_fhv/year=2024/month=1/day=1/part-xxxx.snappy.parquet
+```
+
+All 4 cab types confirmed ✅
+
+### 2.2 Destination Tables
+
+**Staging (Phase 1 write target):**
+```
+nyc_taxi_wh.trip_data_v2_stage
+LOCATION: s3://****/warehouse/nyc_taxi_wh/trip_data_v2_stage
 PARTITIONED BY: day(pickup_datetime)
 ```
 
-### Schema
+**Production (Phase 1 confirmed):**
+```
+nyc_taxi_wh.trip_data
+LOCATION: s3://****/warehouse/nyc_taxi_wh/trip_data
+PARTITIONED BY: day(pickup_datetime)
+```
 
-| Column | Type |
-|--------|------|
-| vendorid | int |
-| cab_type | string |
-| pickup_datetime | timestamp |
-| dropoff_datetime | timestamp |
-| store_and_fwd_flag | string |
-| ratecodeid | bigint |
-| pulocationid | int |
-| dolocationid | int |
-| passenger_count | bigint |
-| trip_distance | double |
-| fare_amount | double |
-| extra | double |
-| mta_tax | double |
-| tip_amount | double |
-| tolls_amount | double |
-| ehail_fee | double |
-| improvement_surcharge | double |
-| total_amount | double |
-| payment_type | bigint |
-| trip_type | bigint |
-| congestion_surcharge | double |
-| airport_fee | double |
-| ingestion_ts | timestamp |
+### 2.3 Final Schema — 26 Columns
+
+| Column | Type | Notes |
+|--------|------|-------|
+| vendorid | int | |
+| cab_type | string | yellow/green/fhv/high_volume_fhv |
+| pickup_datetime | timestamp | partition key |
+| dropoff_datetime | timestamp | |
+| store_and_fwd_flag | string | |
+| ratecodeid | bigint | |
+| pulocationid | int | |
+| dolocationid | int | |
+| passenger_count | bigint | |
+| trip_distance | double | |
+| fare_amount | double | |
+| extra | double | |
+| mta_tax | double | |
+| tip_amount | double | |
+| tolls_amount | double | |
+| ehail_fee | double | NULL if missing |
+| improvement_surcharge | double | |
+| total_amount | double | |
+| payment_type | bigint | |
+| trip_type | bigint | NULL if missing |
+| congestion_surcharge | double | NULL if missing |
+| airport_fee | double | NULL if missing |
+| ingestion_ts | timestamp | pipeline arrival time — watermark |
+| batch_id | string | engine#cab#yyyy_mm_dd#uuid8 |
+| source_file | string | S3 path for lineage |
+| migration_batch_id | string | batch reference |
+| engine_type | string | EMR_7.7.0_MULTI_RES or GLUE_4.0_NETPLAY |
 
 ---
 
-# 3. Safe V2 Approach: Iceberg Staging Table
+## 3. Orchestration — Airflow DAG
 
-To avoid corrupting production during rework/testing:
+**DAG:** `engine_volumetric_router`
+**File:** `iceberg_backfill_migration_framework/scripts/engine_volumetric_router.py`
 
-### Staging Table
+### 3.1 Idempotency Design
 
 ```
-nyc_taxi_wh.trip_data_v2_stage
-LOCATION: s3://teo-nyc-taxi/warehouse/nyc_taxi_wh/trip_data_v2_stage
+Key format : {cab_type}#{yyyy}_{mm}_{dd}
+Example    : yellow#2024_01_15
+
+DynamoDB table: UrbanFlow_Migration_Audit
+  slice_id   → partition key
+  status     → LANDED
+  batch_id   → engine#cab#yyyy_mm_dd#uuid8
+  engine     → emr or glue
+  landed_at  → ISO timestamp
+  TTL        → removed — permanent records
 ```
 
-Created via:
+### 3.2 Engine Routing
+
+```
+S3 volumetric scan → size_gb
+
+size_gb > threshold → EMR Heavy Serve  (emr#...)
+size_gb > 0         → Glue Net Play    (glue#...)
+size_gb = 0         → Safe Exit
+
+⚠️ Threshold Note:
+The routing threshold is configurable and environment-specific.
+AWS Glue 4.0 is production-grade and capable at scale.
+The crossover point depends on:
+  → EMR cluster spin-up cost vs Glue DPU pricing
+  → Workload shape — shuffle-heavy favors EMR
+  → Target data volumes
+Calibrate against your own cost model before production use.
+```
+
+### 3.3 Engine Scripts
+
+| Engine | Script | Key Feature |
+|--------|--------|-------------|
+| EMR Spark 7.7.0 | `emr_iceberg_backfill_migration.py` | repartition(60) before write |
+| AWS Glue 4.0 | `glue_iceberg_backfill_migration.py` | Serverless · zero cluster overhead |
+
+---
+
+## 4. Schema Alignment
+
+Both engines use `align_to_iceberg_schema()` — single SELECT with conditional columns:
+
+```python
+# Conditional columns — NULL if missing in source
+ehail_fee            → F.col("ehail_fee") if "ehail_fee" in cols else F.lit(None)
+trip_type            → F.col("trip_type") if "trip_type" in cols else F.lit(None)
+congestion_surcharge → conditional
+airport_fee          → conditional
+
+# Metadata — always populated
+ingestion_ts         → F.current_timestamp()
+batch_id             → F.lit(BATCH_ID)
+source_file          → F.lit(S3_PATH)
+migration_batch_id   → F.lit(batch_id)
+engine_type          → F.lit("EMR_7.7.0_MULTI_RES") or "GLUE_4.0_NETPLAY"
+```
+
+---
+
+## 5. Benchmark Results
+
+Full 2024 dataset — 42M records across all cab types.
+
+| Engine | Version | Runtime | vs Glue Baseline |
+|--------|---------|---------|-----------------|
+| AWS Glue | Baseline | ~6 min | — |
+| EMR Spark | Baseline | ~3m 16s | −46% |
+| EMR Spark | Optimized Lean | ~1m 34s | −74% · 4× faster |
+
+The biggest improvement came from DAG optimization — not hardware scaling.
+Eliminating redundant scans, controlling write parallelism via `repartition(60)`,
+and simplifying alignment logic cut runtime without cluster resize.
+
+---
+
+## 6. Iceberg Schema Evolution — Executed
+
+After Phase 1 backfill, 4 metadata columns were added to production:
 
 ```sql
-CREATE TABLE IF NOT EXISTS nyc_taxi_wh.trip_data_v2_stage
-LIKE nyc_taxi_wh.trip_data
-LOCATION 's3://teo-nyc-taxi/warehouse/nyc_taxi_wh/trip_data_v2_stage';
-```
+-- Step 1: Add columns (new metadata.json only — no data moved)
+ALTER TABLE nyc_taxi_wh.trip_data
+ADD COLUMNS (
+    batch_id           string COMMENT 'Airflow DAG Run ID or Batch UUID',
+    source_file        string COMMENT 'S3 Path for Lineage',
+    migration_batch_id string,
+    engine_type        string
+);
 
-All 2024 backfill writes **only** to this table.
-
----
-
-# 4. Backfill Logic
-
-## 4.1 Data Filtering Rules
-
-- Only **2024** records  
-- Only **yellow** + **green**  
-- Ignore `fhv` and `hvfhs` (reserved for V3)
-
----
-
-## 4.2 Schema Normalization Rules
-
-Cast all fields to Iceberg schema:
-
-```
-vendorid int
-cab_type string
-pickup_datetime timestamp
-dropoff_datetime timestamp
-store_and_fwd_flag string
-ratecodeid bigint
-pulocationid int
-dolocationid int
-passenger_count bigint
-trip_distance double
-fare_amount double
-extra double
-mta_tax double
-tip_amount double
-tolls_amount double
-ehail_fee double (NULL if missing)
-improvement_surcharge double
-total_amount double
-payment_type bigint
-trip_type bigint (NULL if missing)
-congestion_surcharge double (NULL if missing)
-airport_fee double (NULL if missing)
-ingestion_ts current_timestamp()
-```
-
----
-
-## 4.3 Spark Backfill Job
-
-**File:** `scripts/batch/iceberg_backfill_2024.py`  
-Supports:
-
-- sample mode  
-- month/day selection  
-- row limits  
-- safe overwrite to staging  
-
-Examples:
-
-```bash
-# 1-day smoke test
-spark-submit iceberg_backfill_2024.py --sample --month 5 --day 16 --limit-rows 1000
-
-# One month
-spark-submit iceberg_backfill_2024.py --sample --month 8
-
-# Full 2024 backfill
-spark-submit iceberg_backfill_2024.py
-```
-
----
-
-# 5. Validation Plan
-
-## 5.1 Row Count Validation
-
-```sql
--- processed
-SELECT COUNT(*)
-FROM glue_catalog.trip_data
-WHERE year = 2024 AND cab_type IN ('yellow','green');
-
--- staging
-SELECT COUNT(*)
-FROM nyc_taxi_wh.trip_data_v2_stage
+-- Step 2: Delete existing 2024 data
+DELETE FROM nyc_taxi_wh.trip_data
 WHERE year(pickup_datetime) = 2024;
-```
 
-## 5.2 Min/Max Timestamp
-
-```sql
-SELECT MIN(pickup_datetime), MAX(pickup_datetime)
-FROM nyc_taxi_wh.trip_data_v2_stage;
-```
-
-## 5.3 Null Checks
-
-```sql
-SELECT
-  COUNT(*) FILTER (WHERE total_amount IS NULL) AS total_amount_nulls,
-  COUNT(*) FILTER (WHERE pickup_datetime IS NULL) AS pickup_nulls
-FROM nyc_taxi_wh.trip_data_v2_stage;
-```
-
-## 5.4 Spot Checks
-
-```sql
-SELECT *
-FROM nyc_taxi_wh.trip_data_v2_stage
-ORDER BY pickup_datetime
-LIMIT 50;
-```
-
----
-
-# 6. Promotion to Production
-
-## Case A: Prod missing 2024 → append
-
-```sql
+-- Step 3: Re-insert from staging with all 26 columns
 INSERT INTO nyc_taxi_wh.trip_data
-SELECT *
-FROM nyc_taxi_wh.trip_data_v2_stage
-WHERE year(pickup_datetime) = 2024;
-```
-
-## Case B: Prod has 2024 → replace 2024
-
-```sql
-CREATE OR REPLACE TEMP VIEW trip_data_merge AS
-SELECT * FROM nyc_taxi_wh.trip_data
-WHERE year(pickup_datetime) <> 2024
-UNION ALL
 SELECT * FROM nyc_taxi_wh.trip_data_v2_stage
 WHERE year(pickup_datetime) = 2024;
 
-INSERT OVERWRITE TABLE nyc_taxi_wh.trip_data
-SELECT * FROM trip_data_merge;
+-- Step 4: Cleanup orphaned files
+VACUUM nyc_taxi_wh.trip_data;
 ```
+
+Result: 42M records · all 4 cab types · 26 columns · validated ✅
 
 ---
 
-# 7. Rollback Procedures
+## 7. Validation Suite
 
-### If staging fails
-
-```
-DROP TABLE nyc_taxi_wh.trip_data_v2_stage;
-```
-
-### If production promotion fails
-
-Use Iceberg snapshots:
+### 7.1 Row Count
 
 ```sql
-CALL nyc_taxi_wh.trip_data.rollback_to_snapshot(<snapshot_id>);
+SELECT COUNT(*)
+FROM nyc_taxi_wh.trip_data
+WHERE year(pickup_datetime) = 2024;
+-- Expected: ~42M records
+```
+
+### 7.2 Cab Type Distribution
+
+```sql
+SELECT cab_type, COUNT(*) as record_count
+FROM nyc_taxi_wh.trip_data
+WHERE year(pickup_datetime) = 2024
+GROUP BY cab_type
+ORDER BY record_count DESC;
+-- Expected: all 4 cab types present
+```
+
+### 7.3 Metadata Column Validation
+
+```sql
+SELECT
+  COUNT(*) FILTER (WHERE batch_id IS NULL)           AS batch_id_nulls,
+  COUNT(*) FILTER (WHERE source_file IS NULL)        AS source_file_nulls,
+  COUNT(*) FILTER (WHERE migration_batch_id IS NULL) AS migration_batch_id_nulls,
+  COUNT(*) FILTER (WHERE engine_type IS NULL)        AS engine_type_nulls,
+  COUNT(*) FILTER (WHERE ingestion_ts IS NULL)       AS ingestion_ts_nulls
+FROM nyc_taxi_wh.trip_data
+WHERE year(pickup_datetime) = 2024;
+-- Expected: 0 nulls
+```
+
+### 7.4 Min/Max Timestamps
+
+```sql
+SELECT
+  MIN(pickup_datetime) AS earliest_trip,
+  MAX(pickup_datetime) AS latest_trip
+FROM nyc_taxi_wh.trip_data
+WHERE year(pickup_datetime) = 2024;
+-- Expected: 2024-01-01 → 2024-12-31
+```
+
+### 7.5 dbt Test Suite
+
+```bash
+dbt test --select stg_trip_data --target snowflake_iceberg
+# Expected: 8/8 passing
+
+dbt test --select int_trip_data_core --target snowflake_iceberg
+# Expected: 10/10 passing
+
+dbt test --select fact_trip --target snowflake_iceberg
+# Expected: all passing · 35.6M records
+```
+
+### 7.6 Snowflake Integration
+
+```sql
+SELECT COUNT(*), MIN(pickup_datetime), MAX(pickup_datetime)
+FROM NYC_TAXI_DEV.RAW_ICEBERG.TRIP_DATA
+WHERE year(pickup_datetime) = 2024;
+
+SELECT COUNT(*) FROM NYC_TAXI_DEV.MART_NYC_TAXI.fact_trip;
+-- Expected: 35.6M records after quality filtering + dedup
 ```
 
 ---
 
-# 8. Acceptance Criteria
+## 8. Rollback Procedures
 
-- Schema aligned  
-- Row counts match processed  
-- Min/max timestamps correct  
-- Null checks acceptable  
-- Sample mode validated  
-- Full 2024 validated  
-- Promotion executed & validated  
-- Snapshot before/after promotion  
+### Staging write fails
+
+```sql
+-- Safe — production untouched
+DROP TABLE nyc_taxi_wh.trip_data_v2_stage;
+-- Fix issue, re-run DAG from scratch
+```
+
+### Production promotion fails
+
+```sql
+-- List available snapshots
+SELECT * FROM nyc_taxi_wh.trip_data.history;
+
+-- Roll back to pre-promotion snapshot
+CALL nyc_taxi_wh.system.rollback_to_snapshot(
+  'nyc_taxi_wh.trip_data',
+  <snapshot_id>
+);
+```
+
+### DynamoDB audit out of sync
+
+```python
+# Manually reset day keys to PENDING for re-processing
+# batch_get_item to identify affected keys
+# put_item to reset status = PENDING
+# Re-trigger DAG for affected slice
+```
 
 ---
 
-# 9. Checklist Before Running Full Backfill
+## 9. Acceptance Criteria
 
-- [ ] Run 1-day smoke test  
-- [ ] Run 1-month sample  
-- [ ] Validate V2 stage  
-- [ ] Run full 2024  
-- [ ] Validate again  
-- [ ] Promote to prod  
-- [ ] Snapshot prod before/after  
+| Criteria | Status |
+|----------|--------|
+| All 4 cab types migrated | ✅ Confirmed |
+| 42M records in production | ✅ Confirmed |
+| 26-column schema aligned | ✅ Confirmed |
+| Metadata columns populated | ✅ Confirmed |
+| DynamoDB all keys LANDED | ✅ Confirmed |
+| Iceberg time travel working | ✅ Confirmed |
+| Snowflake external table reads | ✅ Confirmed |
+| dbt staging 8/8 tests pass | ✅ Confirmed |
+| dbt intermediate 10/10 tests pass | ✅ Confirmed |
+| dbt mart fact_trip 35.6M records | ✅ Confirmed |
 
 ---
 
