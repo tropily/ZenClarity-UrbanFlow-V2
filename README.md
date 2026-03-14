@@ -106,12 +106,13 @@ to showcase the routing logic across all slice granularities (day / month / year
 ---
 
 ## 🗺️ Architecture
-![Architecture Diagram](docs/arch_diagrams/ZenClarity-UrbanFlow_architecture.jpg)
+![Architecture Diagram](docs/architecture/ZenClarity-UrbanFlow_architecture_v1.jpgZenClarity-UrbanFlow_architecture-v1.jpg)
+
 **V2 Architecture — Iceberg Migration Framework**
 
 ```mermaid
 graph TD
-    S3[S3 Raw Parquet] --> G1
+    S3[Glue Catalog nyc_taxi_db\nprocessed/trip_data/] --> G1
     G1[Gate 1 DynamoDB Idempotency] --> G2
     G2[Gate 2 S3 Volumetric Scan] --> EMR
     G2 --> GLUE
@@ -145,7 +146,8 @@ graph TD
 > One dbt codebase runs on **Snowflake**, **Redshift**, and **EMR Spark** —
 > true engine flexibility with no rewrites.
 
-![Portability Overview](docs/arch_diagrams/portability_overview.jpg)
+![Portability Overview](docs/architecture/portability_overview.jpg)
+(docs/arch_diagrams/ZenClarity-UrbanFlow_architecture.jpg)
 
 **Why it matters**
 - Avoids vendor lock-in and simplifies migrations
