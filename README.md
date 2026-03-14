@@ -106,7 +106,13 @@ to showcase the routing logic across all slice granularities (day / month / year
 ---
 
 ## 🗺️ Architecture
-![Architecture Diagram](docs/architecture/ZenClarity-UrbanFlow_architecture_v1.jpgZenClarity-UrbanFlow_architecture-v1.jpg)
+### V2 — Lakehouse Architecture
+> 📐 Full V2 Lakehouse Architecture diagram in progress —
+> will be updated soon with Airflow orchestration,
+> streaming ingestion, Iceberg layer, dbt medallion stack,
+> and observability layer end to end.
+
+![Architecture Diagram](docs/architecture/ZenClarity-UrbanFlow_architecture_v1.jpg)
 
 **V2 Architecture — Iceberg Migration Framework**
 
