@@ -114,25 +114,9 @@ to showcase the routing logic across all slice granularities (day / month / year
 
 ![Architecture Diagram](docs/architecture/ZenClarity-UrbanFlow_architecture_v1.jpg)
 
-**V2 Architecture — Iceberg Migration Framework**
+**Iceberg Migration Framework**
+![Architecture Diagram](iceberg_backfill_migration_framework/docs/migration_framework_diagram.jpg)
 
-```mermaid
-graph TD
-    S3[Glue Catalog nyc_taxi_db\nprocessed/trip_data/] --> G1
-    G1[Gate 1 DynamoDB Idempotency] --> G2
-    G2[Gate 2 S3 Volumetric Scan] --> EMR
-    G2 --> GLUE
-    G2 --> EXIT[Safe Exit]
-    EMR[EMR Spark 7.7.0] --> AUDIT
-    GLUE[AWS Glue 4.0] --> AUDIT
-    AUDIT[DynamoDB Audit LANDED] --> ICE
-    ICE[Apache Iceberg S3 Glue Catalog] --> SF
-    SF[Snowflake RAW ICEBERG] --> BRONZE
-    BRONZE[BRONZE stg trip data] --> SILVER
-    SILVER[SILVER int trip data core] --> GOLD
-    GOLD[GOLD fact trip 35.6M records] --> BI
-    BI[Streamlit Dashboard]
-```
 
 > ⚠️ **Engine Routing Threshold Note:**
 > The volumetric threshold shown above is **configurable and environment-specific** —
