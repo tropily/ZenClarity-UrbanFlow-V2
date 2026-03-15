@@ -115,6 +115,7 @@ to showcase the routing logic across all slice granularities (day / month / year
 ![Architecture Diagram](docs/architecture/ZenClarity-UrbanFlow_architecture_v1.jpg)
 
 **Iceberg Migration Framework**
+
 ![Architecture Diagram](iceberg_backfill_migration_framework/docs/migration_framework_diagram.jpg)
 
 
