@@ -14,13 +14,13 @@
 | EMR Spark backfill job | ✅ Confirmed | 4× faster than Glue at scale |
 | Glue vs EMR benchmark | ✅ Confirmed | 42M records · 6 min vs 1.5 min · threshold configurable |
 | Airflow DAG — volumetric router | ✅ Confirmed | Cost-aware engine selection · both engines live |
-| DynamoDB idempotency audit | ✅ Confirmed | Day-granularity · permanent records · batch reads |
+| DynamoDB idempotency audit | ✅ Confirmed | Day-granularity · permanent records · batch reads | 
+| Snowflake Iceberg integration |  ✅ Confirmed | External volume + storage integration |
 | dbt staging layer | ✅ Confirmed | `stg_trip_data` · 8 tests passing · Snowflake live |
 | dbt intermediate layer | ✅ Confirmed | `int_trip_data_core` · incremental · dedup · DQ models · 10 tests passing |
 | dbt mart layer | ✅ Confirmed | `fact_trip` · 35.6M records · tip_pct · time_of_day · airport flag |
 | Monthly delta ingestion → Iceberg | 🔧 In Progress | V1 Glue job still active on `/processed/` · re-point underway |
 | Airflow DAG — full pipeline cutover | 🔧 In Progress | Replaces Step Functions · adds dbt downstream |
-| Snowflake Iceberg integration | ⬡ Next | External volume + storage integration |
 | CI/CD — GitHub Actions | ○ Planned | dbt test on PR · deploy on merge |
 
 ---
