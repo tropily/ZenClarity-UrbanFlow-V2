@@ -1,3 +1,21 @@
+# ============================================================
+# int_trip_data_core.yml
+# UrbanFlow V2 — Intermediate core model tests + documentation
+# ============================================================
+# CHANGE LOG:
+# Mar 2026 — Nguyen Le | ZenClarity Consulting
+#             Initial tests: unique, not_null, accepted_values
+#
+# Mar 2026 — Nguyen Le | ZenClarity Consulting
+#             Added dbt_expectations threshold tests (WBS 5.5.4)
+#             Mirrors quality filters in int_trip_data_core.sql
+#             trip_distance > 0
+#             fare_amount > 0
+#             total_amount > 0
+#             passenger_count between 1 and 6
+#             Bad records routed to int_trip_data_quarantine
+# ============================================================
+
 version: 2
 
 models:
@@ -18,8 +36,12 @@ models:
         description: "Taxi cab type — yellow, green, fhv, high_volume_fhv"
         tests:
           - not_null
-          - accepted_values:
-              values: ['yellow', 'green', 'fhv', 'high_volume_fhv']
+          # accepted_values replaced by dbt_expectations (WBS 5.5.4)
+          # kept for reference — strict controlled vocabulary
+          # - accepted_values:
+          #     values: ['yellow', 'green', 'fhv', 'high_volume_fhv']
+          - dbt_expectations.expect_column_values_to_be_in_set:
+              value_set: ['yellow', 'green', 'fhv', 'high_volume_fhv']
 
       - name: vendor_id
         tests:
@@ -33,10 +55,38 @@ models:
         tests:
           - not_null
 
+      - name: trip_distance
+        description: "Trip distance in miles — strictly greater than 0"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: true
+
+      - name: fare_amount
+        description: "Base fare amount — strictly greater than 0"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+              
       - name: total_amount
         description: "Total fare amount — always positive (quality filter applied)"
         tests:
           - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: true
+
+      - name: passenger_count
+        description: "Passenger count — between 1 and 6"
+        tests:
+          - not_null
+          # ADD dbt_expectations test HERE
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 6
 
       - name: trip_duration_minutes
         description: "Derived — datediff minutes between pickup and dropoff"

@@ -37,6 +37,7 @@ quality_filtered as (
         and trip_distance > 0
         and pickup_datetime < dropoff_datetime
         and passenger_count between 1 and 6
+        and fare_amount   >= 0
 
 ),
 

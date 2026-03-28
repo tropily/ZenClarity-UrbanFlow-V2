@@ -1,0 +1,21 @@
+version: 2
+
+seeds:
+  - name: vendor
+    description: "Static vendor reference table. Source of truth for NYC Taxi vendor ID to vendor name mapping."
+    columns:
+      - name: vendor_id
+        description: "Primary key. TLC vendor identifier."
+        tests:
+          - not_null
+          - unique
+      - name: vendor_name
+        description: "Full legal vendor name."
+        tests:
+          - not_null
+      - name: status
+        description: "Current vendor status."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['active', 'suspended', 'inactive']

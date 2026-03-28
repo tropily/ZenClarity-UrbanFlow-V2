@@ -35,7 +35,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['yellow', 'green', 'fhv', 'high_volume_fhv']
+              arguments:
+               values: ['yellow', 'green', 'fhv', 'high_volume_fhv']
 
       - name: pickup_datetime
         tests:
@@ -72,3 +73,34 @@ models:
                 to: ref('dim_taxi_zone')
                 field: location_id
               where: "dropoff_location_id is not null"
+
+exposures:
+
+      - name: streamlit_trip_dashboard
+        type: dashboard
+        maturity: medium
+        description: >
+          Live Streamlit dashboard displaying NYC Taxi KPIs.
+          Tracks trip counts, total fare revenue, average trip duration,
+          passengers carried, and real-time vs baseline comparisons.
+        depends_on:
+          - ref('fact_trip')
+          - ref('dim_taxi_zone')
+          - ref('dim_date')
+        owner:
+          name: Nguyen Le
+          email: nguyen.le@zenclarity.net
+
+      - name: quicksight_dq_report
+        type: dashboard
+        maturity: low
+        description: >
+          QuickSight operational report for data quality monitoring.
+          Tracks DQ failure reasons by load date and failure category.
+          Supports data stewardship and pipeline health visibility.
+        depends_on:
+          - ref('fact_trip')
+          - ref('dq_trip_issue_summary')
+        owner:
+          name: Nguyen Le
+          email: nguyen.le@zenclarity.net
