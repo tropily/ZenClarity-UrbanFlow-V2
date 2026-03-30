@@ -270,7 +270,7 @@ ZenClarity-UrbanFlow-V2/
 - `dq_trip_issue_summary` — view · aggregated DQ signals by load date + failure reason
 
 **Snapshots (`SNAPSHOTS`)**
-- `snap_vendor` — SCD Type 2 · check strategy on `zone` + `borough` · 7/7 tests passing
+- `snap_vendor` — SCD Type 2 · check strategy on `vendor_name` + `status` · 7/7 tests passing
 
 **Macros**
 - `safe_divide` — division by zero protection · applied in `fact_trip` tip_pct calculation
