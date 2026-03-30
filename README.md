@@ -318,10 +318,9 @@ ZenClarity-UrbanFlow-V2/
 - Dashboard update — Streamlit + QuickSight on V2 mart layer
 
 **V2 Phase 3 — Next ⬡**
-- Snowflake Iceberg external tables + storage integration
+- CI/CD — GitHub Actions (dbt test on PR · deploy on merge)
 - Benchmark: Snowflake Iceberg vs original external table
 - Benchmark: Redshift Spectrum vs Snowflake external table
-- CI/CD — GitHub Actions (dbt test on PR · deploy on merge)
 
 **V3 — Planned ○**
 - Reconciliation DAG — DynamoDB LANDED vs Iceberg partition drift detection
