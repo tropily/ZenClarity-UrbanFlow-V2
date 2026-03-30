@@ -80,13 +80,9 @@ final as (
         congestion_surcharge,
         airport_fee,
         total_amount,
-
-        -- ── Derived metrics ──
-        -- Tip percentage — tipping behavior by zone/cab/hour
-        round(
-            tip_amount / nullif(fare_amount, 0) * 100,
-        2)                                  as tip_pct,
-
+            -- derived metrics using macros
+        {{ safe_divide('tip_amount', 'total_amount') }}  as tip_pct,
+     
         -- Time of day bucket — demand pattern analysis
         case
             when hour(pickup_datetime) between 6  and 9  then 'morning'
@@ -98,11 +94,9 @@ final as (
 
         -- Airport trip flag — high value segment
         -- Location IDs: 1=EWR, 132=JFK, 138=LGA
-        case
-            when pickup_location_id  in (1, 132, 138) then true
-            when dropoff_location_id in (1, 132, 138) then true
-            else false
-        end                                 as is_airport_trip,
+        -- using is_airport_trip macro
+        {{ is_airport_trip('pickup_location_id') }}      as is_airport_pickup,
+        {{ is_airport_trip('dropoff_location_id')}}     as is_airport_dropoff,
 
         -- ── Lineage ──
         ingestion_ts

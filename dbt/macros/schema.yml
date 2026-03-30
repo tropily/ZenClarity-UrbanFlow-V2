@@ -1,0 +1,40 @@
+version: 2
+
+macros:
+  - name: safe_divide
+    description: >
+      Safely divides numerator by denominator.
+      Returns 0 when denominator is 0 or null.
+      Prevents division by zero errors in tip_pct
+      and other ratio calculations.
+    arguments:
+      - name: numerator
+        type: string
+        description: "The numerator column or expression"
+      - name: denominator
+        type: string
+        description: "The denominator column or expression"
+
+  - name: is_airport_trip
+    description: >
+      Returns TRUE if the location_id corresponds to
+      an NYC area airport. Covers JFK (132),
+      LaGuardia (138), and Newark (1).
+      Used in fact_trip for is_airport_pickup
+      and is_airport_dropoff flags.
+    arguments:
+      - name: location_id
+        type: string
+        description: "The pickup or dropoff location_id column"
+
+  - name: cents_to_dollars
+    description: >
+      Converts a cents integer value to a dollar amount
+      rounded to 2 decimal places. NYC taxi fare amounts
+      are already in dollars so this macro is not applied
+      in fact_trip — included as a reusable pattern for
+      datasets that store monetary values in cents.
+    arguments:
+      - name: amount
+        type: string
+        description: "The cents amount column to convert"
