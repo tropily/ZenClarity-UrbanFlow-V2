@@ -17,8 +17,12 @@
 | DynamoDB idempotency audit | ✅ Confirmed | Day-granularity · permanent records · batch reads | 
 | Snowflake Iceberg integration |  ✅ Confirmed | External volume + storage integration |
 | dbt staging layer | ✅ Confirmed | `stg_trip_data` · 8 tests passing · Snowflake live |
-| dbt intermediate layer | ✅ Confirmed | `int_trip_data_core` · incremental · dedup · DQ models · 10 tests passing |
+| dbt intermediate layer | ✅ Confirmed | `int_trip_data_core` · incremental · dedup · DQ models · 17/17 tests passing |
 | dbt mart layer | ✅ Confirmed | `fact_trip` · 35.6M records · tip_pct · time_of_day · airport flag |
+| dbt SCD Type 2 snapshot | ✅ Confirmed | `snap_vendor` · check strategy · 7/7 tests passing |
+| dbt packages | ✅ Confirmed | dbt_utils 1.3.3 · dbt_expectations · 17/17 tests passing |
+| dbt exposures | ✅ Confirmed | streamlit_trip_dashboard · quicksight_dq_report · lineage confirmed |
+| dbt macros | ✅ Confirmed | `safe_divide` · `is_airport_trip` · `cents_to_dollars` · applied in `fact_trip` |
 | Monthly delta ingestion → Iceberg | 🔧 In Progress | V1 Glue job still active on `/processed/` · re-point underway |
 | Airflow DAG — full pipeline cutover | 🔧 In Progress | Replaces Step Functions · adds dbt downstream |
 | CI/CD — GitHub Actions | ○ Planned | dbt test on PR · deploy on merge |
@@ -138,7 +142,6 @@ to showcase the routing logic across all slice granularities (day / month / year
 > true engine flexibility with no rewrites.
 
 ![Portability Overview](docs/architecture/portability_overview.jpg)
-(docs/arch_diagrams/ZenClarity-UrbanFlow_architecture.jpg)
 
 **Why it matters**
 - Avoids vendor lock-in and simplifies migrations
@@ -202,10 +205,9 @@ ZenClarity-UrbanFlow-V2/
 │  ├─ models/
 │  │  ├─ staging/                          ← Bronze layer
 │  │  │  ├─ stg_trip_data.sql
-│  │  │  └─ stg_taxi_zone_lookup.sql
-│  │  │  └─ sources.yml  
+│  │  │  ├─ stg_taxi_zone_lookup.sql
+│  │  │  └─ sources.yml
 │  │  ├─ intermediate/                     ← Silver layer
-│  │  │  ├─ int_taxi_zone_lookup.sql
 │  │  │  ├─ int_trip_data_core.sql
 │  │  │  ├─ int_trip_data_quarantine.sql
 │  │  │  └─ int_trip_data_dq_duplicates.sql
@@ -214,6 +216,14 @@ ZenClarity-UrbanFlow-V2/
 │  │     ├─ dim_date.sql
 │  │     ├─ dim_taxi_zone.sql
 │  │     └─ dq_trip_issue_summary.sql
+│  ├─ snapshots/                           ← SCD Type 2
+│  │  └─ snap_vendor.sql
+│  ├─ seeds/                               ← Reference data
+│  │  └─ vendor.csv
+│  ├─ macros/                              ← Reusable Jinja macros
+│  │  ├─ safe_divide.sql
+│  │  ├─ is_airport_trip.sql
+│  │  └─ cents_to_dollars.sql
 │  └─ packages.yml
 ├─ analytics/
 ├─ config/
@@ -246,19 +256,26 @@ ZenClarity-UrbanFlow-V2/
 
 **Bronze — Staging (`STG_NYC_TAXI`)**
 - `stg_trip_data` — view · 1:1 with Iceberg source · cast + rename only · 8 tests passing
-- `stg_taxi_zone_lookup` — view · 1:1 with Iceberg source · cast + rename only · 
-
+- `stg_taxi_zone_lookup` — view · 1:1 with Iceberg source · cast + rename only
 
 **Silver — Intermediate (`INT_NYC_TAXI`)**
-- `int_trip_data_core` — incremental table · quality filtered · deduped on `dropoff_datetime` · zone enriched · surrogate keyed · 10 tests passing
-- `int_trip_data_quarantine` — live DQ view · self-healing · bad quality trips flagged with reason array
-- `int_trip_data_dq_duplicates` — live DQ view · duplicate submission detection · fare/distance/dropoff variance signals for upstream investigation
+- `int_trip_data_core` — incremental table · quality filtered · deduped · zone enriched · surrogate keyed · 17/17 tests passing
+- `int_trip_data_quarantine` — live DQ view · bad quality trips flagged with reason array
+- `int_trip_data_dq_duplicates` — live DQ view · duplicate submission detection
 
 **Gold — Marts (`MART_NYC_TAXI`)**
-- `fact_trip` — incremental table · 35.6M records · pre-computed metrics: `tip_pct` · `time_of_day` · `is_airport_trip`
-- `dim_taxi_zone` — table · 265 taxi zones with borough + service zone
+- `fact_trip` — view · 35.6M records · `tip_pct` · `time_of_day` · `is_airport_trip` · macros applied
+- `dim_taxi_zone` — view · 265 taxi zones with borough + service zone
 - `dim_date` — table · 2020–2030 calendar dimension
 - `dq_trip_issue_summary` — view · aggregated DQ signals by load date + failure reason
+
+**Snapshots (`SNAPSHOTS`)**
+- `snap_vendor` — SCD Type 2 · check strategy on `zone` + `borough` · 7/7 tests passing
+
+**Macros**
+- `safe_divide` — division by zero protection · applied in `fact_trip` tip_pct calculation
+- `is_airport_trip` — airport LocationID detection · JFK · LaGuardia · Newark
+- `cents_to_dollars` — fare normalization utility
 
 📑 [View dbt Project Documentation (S3 Hosted)](http://nle-dbt-docs.s3-website-us-east-1.amazonaws.com/#!/overview)
 
@@ -288,7 +305,12 @@ ZenClarity-UrbanFlow-V2/
 - Iceberg staging table + backfill framework (Glue + EMR)
 - Cost-aware Airflow DAG with DynamoDB idempotency audit
 - Both engines benchmarked and confirmed working
+- Snowflake Iceberg integration — external volume + catalog integration
 - Full dbt medallion stack — staging + intermediate + marts on Snowflake + Iceberg
+- SCD Type 2 snapshot — `snap_vendor` · check strategy · 7/7 tests passing
+- dbt packages — dbt_utils + dbt_expectations · 17/17 tests passing
+- dbt macros — safe_divide · is_airport_trip · cents_to_dollars
+- dbt exposures — Streamlit + QuickSight lineage confirmed in dbt docs
 
 **V2 Phase 2 — In Progress 🔧**
 - Monthly delta ingestion Glue job re-pointed to Iceberg (replaces V1 `/processed/` path)
