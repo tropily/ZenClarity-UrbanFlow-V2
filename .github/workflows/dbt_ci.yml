@@ -29,11 +29,9 @@ jobs:
           echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > /tmp/snowflake_rsa_key.p8
 
       - name: dbt deps
-        run: dbt deps
+        run: dbt deps --profiles-dir ./profiles
         working-directory: ./dbt
 
       - name: dbt test
-        run: dbt test --target snowflake_iceberg
+        run: dbt test --target snowflake_iceberg --profiles-dir ./profiles
         working-directory: ./dbt
-
-# CI test
