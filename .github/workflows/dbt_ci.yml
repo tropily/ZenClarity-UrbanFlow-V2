@@ -26,8 +26,9 @@ jobs:
 
       - name: Write Snowflake private key
         run: |
-          echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > /tmp/snowflake_rsa_key.p8
-
+          echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" | sed 's/\\n/\n/g' > /tmp/snowflake_rsa_key.p8
+          chmod 600 /tmp/snowflake_rsa_key.p8
+          
       - name: dbt deps
         run: dbt deps --profiles-dir ./profiles
         working-directory: ./dbt
