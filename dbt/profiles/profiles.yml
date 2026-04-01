@@ -1,0 +1,15 @@
+zenclarity_urbanflow:
+  target: snowflake_iceberg
+  outputs:
+    snowflake_iceberg:
+      type: snowflake
+      account: exszpbh-zyc01636
+      user: DBT_DEV_USER_VIPER
+      private_key_path: /tmp/snowflake_rsa_key.p8
+      role: DBT_DEV_ROLE
+      warehouse: COMPUTE_WH
+      database: NYC_TAXI_DEV
+      schema: STG_NYC_TAXI
+      query_tag: 'CI_ZenClarity_UrbanFlow'
+      threads: 4
+      client_session_keep_alive: false

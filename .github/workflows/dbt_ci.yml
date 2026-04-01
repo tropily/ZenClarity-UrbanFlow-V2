@@ -26,13 +26,13 @@ jobs:
 
       - name: Write Snowflake private key
         run: |
-          echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > /tmp/snowflake_rsa_key.p8
+          echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY_B64 }}" | base64 -d > /tmp/snowflake_rsa_key.p8
+          chmod 600 /tmp/snowflake_rsa_key.p8
 
       - name: dbt deps
-        run: dbt deps
+        run: dbt deps --profiles-dir ./profiles
         working-directory: ./dbt
 
       - name: dbt test
-        run: dbt test --target snowflake_iceberg
+        run: dbt test --target snowflake_iceberg --profiles-dir ./profiles
         working-directory: ./dbt
-
