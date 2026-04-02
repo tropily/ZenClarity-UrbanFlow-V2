@@ -23,9 +23,9 @@
 | dbt packages | ✅ Confirmed | dbt_utils 1.3.3 · dbt_expectations · 17/17 tests passing |
 | dbt exposures | ✅ Confirmed | streamlit_trip_dashboard · quicksight_dq_report · lineage confirmed |
 | dbt macros | ✅ Confirmed | `safe_divide` · `is_airport_trip` · `cents_to_dollars` · applied in `fact_trip` |
+| CI/CD — GitHub Actions | ✅ Confirmed | dbt test on PR · deploy on merge |
 | Monthly delta ingestion → Iceberg | 🔧 In Progress | V1 Glue job still active on `/processed/` · re-point underway |
 | Airflow DAG — full pipeline cutover | 🔧 In Progress | Replaces Step Functions · adds dbt downstream |
-| CI/CD — GitHub Actions | ○ Planned | dbt test on PR · deploy on merge |
 
 ---
 
