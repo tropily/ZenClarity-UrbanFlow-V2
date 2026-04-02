@@ -1,7 +1,12 @@
 # 🌆 ZenClarity-UrbanFlow — NYC Taxi Data Engineering Platform
 > **A modern data engineering platform** combining streaming + batch pipelines, dbt-powered transformations,
 > and multi-engine analytics across **Redshift Serverless**, **Snowflake**, and **EMR Spark.**
-> Designed for **portability**, **scalability**, **cost-performance benchmarking**, and **real-time insights** delivered via Streamlit.
+> Built around a production-grade **Iceberg migration framework** processing 42M+ records with cost-aware
+> engine routing — designed for **portability**, **scalability**, **cost-performance benchmarking**,
+> and **real-time insights** delivered via Streamlit.
+
+> 📌 **Evolved from V1:** [ZenClarity-UrbanFlow V1](https://github.com/tropily/ZenClarity-UrbanFlow) —
+> the original Step Functions · Glue · Redshift pipeline that V2 was built to replace.
 
 ---
 
