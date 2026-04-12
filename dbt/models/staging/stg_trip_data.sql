@@ -2,15 +2,32 @@
 -- stg_trip_data.sql
 -- UrbanFlow V2 — Staging model for NYC Taxi trip data
 -- Source : nyc_taxi_wh.trip_data (Iceberg via Glue catalog)
--- Updated: March 2026
+-- Updated: April 2026
 -- ============================================================
 
-{{ config(materialized='view') }}
+{{
+    config(
+        materialized         = 'incremental'    if target.type == 'redshift' else 'view',
+        unique_key           = ['vendor_id', 'cab_type', 'pickup_location_id',
+                                'dropoff_location_id', 'pickup_datetime', 'ingestion_ts']
+                                if target.type == 'redshift' else none,
+        incremental_strategy = 'merge'          if target.type == 'redshift' else none,
+        dist                 = 'ingestion_ts'   if target.type == 'redshift' else none,
+        sort_keys            = ['ingestion_ts'] if target.type == 'redshift' else none
+    )
+}}
 
 with source as (
 
     select *
     from {{ source('nyc_taxi', 'trip_data') }}
+
+    {% if is_incremental() %}
+    where ingestion_ts > (
+        select max(ingestion_ts)
+        from {{ this }}
+    )
+    {% endif %}
 
 ),
 
@@ -35,19 +52,19 @@ cleaned as (
 
         -- trip attributes
         cast(passenger_count as integer)       as passenger_count,
-        cast(trip_distance   as double)        as trip_distance,
+        cast(trip_distance   as float)         as trip_distance,
 
         -- monetary fields
-        cast(fare_amount           as double)  as fare_amount,
-        cast(extra                 as double)  as extra,
-        cast(mta_tax               as double)  as mta_tax,
-        cast(tip_amount            as double)  as tip_amount,
-        cast(tolls_amount          as double)  as tolls_amount,
-        cast(ehail_fee             as double)  as ehail_fee,
-        cast(improvement_surcharge as double)  as improvement_surcharge,
-        cast(total_amount          as double)  as total_amount,
-        cast(congestion_surcharge  as double)  as congestion_surcharge,
-        cast(airport_fee           as double)  as airport_fee,
+        cast(fare_amount           as float)   as fare_amount,
+        cast(extra                 as float)   as extra,
+        cast(mta_tax               as float)   as mta_tax,
+        cast(tip_amount            as float)   as tip_amount,
+        cast(tolls_amount          as float)   as tolls_amount,
+        cast(ehail_fee             as float)   as ehail_fee,
+        cast(improvement_surcharge as float)   as improvement_surcharge,
+        cast(total_amount          as float)   as total_amount,
+        cast(congestion_surcharge  as float)   as congestion_surcharge,
+        cast(airport_fee           as float)   as airport_fee,
 
         -- payment / trip type
         cast(payment_type as integer)          as payment_type,

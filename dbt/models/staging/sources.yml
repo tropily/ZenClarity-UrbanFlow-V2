@@ -4,34 +4,13 @@ sources:
   - name: nyc_taxi
     description: "Canonical raw NYC Taxi datasets across engines."
 
-    database: >
-      {% if target.type in ['snowflake', 'redshift'] %}
-        NYC_TAXI_DEV
-      {% elif target.type in ['spark', 'databricks'] %}
-        nyc_taxi_wh
-      {% elif target.type == 'bigquery' %}
-        {{ env_var('BQ_PROJECT', 'my_bq_project') }}
-      {% else %}
-        nyc_taxi_db
-      {% endif %}
+    database: "{% if target.type == 'snowflake' %}NYC_TAXI_DEV{% elif target.type == 'redshift' %}nyc_taxi_db{% elif target.type in ['spark', 'databricks'] %}nyc_taxi_wh{% elif target.type == 'bigquery' %}{{ env_var('BQ_PROJECT', 'my_bq_project') }}{% else %}nyc_taxi_db{% endif %}"
 
-    schema: >
-      {% if target.type in ['snowflake', 'redshift'] %}
-        RAW_ICEBERG
-      {% elif target.type in ['spark', 'databricks'] %}
-        nyc_taxi_wh
-      {% elif target.type == 'bigquery' %}
-        raw_nyc_taxi
-      {% else %}
-        public
-      {% endif %}
+    schema: "{% if target.type == 'snowflake' %}RAW_ICEBERG{% elif target.type == 'redshift' %}spectrum_nyc_taxi{% elif target.type in ['spark', 'databricks'] %}nyc_taxi_wh{% elif target.type == 'bigquery' %}raw_nyc_taxi{% else %}public{% endif %}"
 
     tables:
       - name: trip_data
         description: "UrbanFlow V2 — NYC Taxi trips via Glue Iceberg catalog. All cab types."
- #        freshness:
- #        warn_after:  {count: 24, period: hour}
- #        error_after: {count: 48, period: hour}
         loaded_at_field: ingestion_ts
       - name: taxi_zone_lookup
         description: "NYC taxi zone reference table with borough and service zone."

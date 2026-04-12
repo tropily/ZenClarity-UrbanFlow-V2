@@ -4,11 +4,11 @@
 -- UrbanFlow V2 — Trip fact table
 -- Marts (Gold) layer — pre-computed metrics, star schema ready
 -- Source : int_trip_data_core (intermediate-silver layer)
--- Updated: March 2026
+-- Updated: April 2026
 --  > Added Time of day bucket — demand pattern analysis
---  >  Added Airport Flag 
+--  > Added Airport Flag
 --  > Added tip %
---UPDATED 03-2026
+--  > April 2026 — Redshift portability fix (HOUR → EXTRACT)
 -- ============================================================
 
 {{ config(
@@ -22,8 +22,6 @@ with core as (
     select *
     from {{ ref('int_trip_data_core') }}
 
-    -- Incremental filter — arrival time watermark
-    -- Handles late arriving + historical reloads correctly
     {% if is_incremental() %}
     where ingestion_ts > (select max(ingestion_ts) from {{ this }})
     {% endif %}
@@ -80,28 +78,41 @@ final as (
         congestion_surcharge,
         airport_fee,
         total_amount,
-            -- derived metrics using macros
+
+        -- ── Derived metrics ──
         {{ safe_divide('tip_amount', 'total_amount') }}  as tip_pct,
-     
+
         -- Time of day bucket — demand pattern analysis
         case
-            when hour(pickup_datetime) between 6  and 9  then 'morning'
-            when hour(pickup_datetime) between 10 and 15 then 'afternoon'
-            when hour(pickup_datetime) between 16 and 19 then 'evening'
-            when hour(pickup_datetime) between 20 and 23 then 'night'
+            when {% if target.type == 'redshift' %}
+                 extract(hour from pickup_datetime)
+                 {% else %}
+                 hour(pickup_datetime)
+                 {% endif %} between 6  and 9  then 'morning'
+            when {% if target.type == 'redshift' %}
+                 extract(hour from pickup_datetime)
+                 {% else %}
+                 hour(pickup_datetime)
+                 {% endif %} between 10 and 15 then 'afternoon'
+            when {% if target.type == 'redshift' %}
+                 extract(hour from pickup_datetime)
+                 {% else %}
+                 hour(pickup_datetime)
+                 {% endif %} between 16 and 19 then 'evening'
+            when {% if target.type == 'redshift' %}
+                 extract(hour from pickup_datetime)
+                 {% else %}
+                 hour(pickup_datetime)
+                 {% endif %} between 20 and 23 then 'night'
             else 'late_night'
-        end                                 as time_of_day,
+        end                                              as time_of_day,
 
-        -- Airport trip flag — high value segment
-        -- Location IDs: 1=EWR, 132=JFK, 138=LGA
-        -- using is_airport_trip macro
+        -- Airport trip flag
         {{ is_airport_trip('pickup_location_id') }}      as is_airport_pickup,
-        {{ is_airport_trip('dropoff_location_id')}}     as is_airport_dropoff,
+        {{ is_airport_trip('dropoff_location_id') }}     as is_airport_dropoff,
 
         -- ── Lineage ──
         ingestion_ts
-        -- metadata columns dropped:
-        -- batch_id, source_file, migration_batch_id, engine_type
 
     from core
 

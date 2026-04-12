@@ -2,7 +2,7 @@
 
 {{
     config(
-        target_schema='SNAPSHOTS',
+        target_schema='snapshots',
         unique_key='vendor_id',
         strategy='check',
         check_cols=['vendor_name', 'status']

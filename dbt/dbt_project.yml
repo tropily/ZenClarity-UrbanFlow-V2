@@ -16,8 +16,8 @@ models:
   zenclarity_urbanflow:
     +materialized: view
 
-    staging:      { +schema: STG_NYC_TAXI,  +tags: ['staging'] }
-    intermediate: { +schema: INT_NYC_TAXI,  +tags: ['intermediate'] }
-    marts:        { +schema: MART_NYC_TAXI, +tags: ['marts'] }
+    staging:      { +schema: stg_nyc_taxi,  +tags: ['staging'] }
+    intermediate: { +schema: int_nyc_taxi,  +tags: ['intermediate'] }
+    marts:        { +schema: mart_nyc_taxi, +tags: ['marts'] }
 
 

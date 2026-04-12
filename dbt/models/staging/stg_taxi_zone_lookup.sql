@@ -1,4 +1,13 @@
-{{ config(materialized='view') }}
+-- ============================================================
+-- stg_taxi_zone_lookup.sql
+-- UrbanFlow V2 — Staging model for NYC Taxi zone lookup
+-- Source : nyc_taxi_wh.taxi_zone_lookup (Iceberg via Glue catalog)
+-- Updated: April 2026
+-- ============================================================
+
+{{ config(
+    materialized = 'table' if target.type == 'redshift' else 'view'
+) }}
 
 with source as (
 
@@ -17,7 +26,6 @@ cleaned as (
         lower(trim(borough))                  as borough,
         lower(trim(zone))                     as zone,
         lower(trim(service_zone))             as service_zone
-
 
     from source
 
