@@ -28,6 +28,8 @@
 | dbt packages | ✅ Confirmed | dbt_utils 1.3.3 · dbt_expectations · 17/17 tests passing |
 | dbt exposures | ✅ Confirmed | streamlit_trip_dashboard · quicksight_dq_report · lineage confirmed |
 | dbt macros | ✅ Confirmed | `safe_divide` · `is_airport_trip` · `cents_to_dollars` · applied in `fact_trip` |
+| Redshift Spectrum integration | ✅ Confirmed | External schema · spectrum_nyc_taxi · 41.1M records validated |
+| Snowflake vs Redshift benchmark | ✅ Confirmed | 5 queries · single dbt codebase · docs/benchmark/ |
 | CI/CD — GitHub Actions | ✅ Confirmed | dbt test on PR · deploy on merge |
 | Monthly delta ingestion → Iceberg | 🔧 In Progress | V1 Glue job still active on `/processed/` · re-point underway |
 | Airflow DAG — full pipeline cutover | 🔧 In Progress | Replaces Step Functions · adds dbt downstream |
@@ -153,6 +155,22 @@ to showcase the routing logic across all slice granularities (day / month / year
 - Enables apples-to-apples benchmarking across engines
 - Keeps analytics consistent and DRY with shared models and macros
 
+**Snowflake vs Redshift — Benchmark Results (April 2026)**
+
+Same S3 Iceberg source · Same dbt models · Minimum viable compute tier
+
+| Metric | Snowflake XS | Redshift 8 RPU | Winner |
+|--------|-------------|----------------|--------|
+| dbt full build | 14.65s | 36.93s | Snowflake 2.5x |
+| Q1 cold — full scan | 2.105s | 26.000s | Snowflake 12x |
+| Q2 cold — date filter | 0.885s | 0.451s | Redshift 2x |
+| Q3 warm — join query | 0.507s | 0.054s | Redshift 9x |
+| Q1 warm — full scan | 0.461s | 0.050s | Redshift 9x |
+
+> Redshift cold start penalty (~25s) dominates first query after idle.
+> Once warm, Redshift outperforms Snowflake on every query pattern tested.
+> Full benchmark analysis → [docs/benchmark/](docs/benchmark/)
+
 ---
 
 ## 📊 Project Highlights
@@ -194,49 +212,55 @@ to showcase the routing logic across all slice granularities (day / month / year
 - **Apache Airflow (Docker)** — EMR Spark batch runs for custom workloads
 
 ---
-
 ## 📂 Repo Structure
 
-```text
+```
 ZenClarity-UrbanFlow-V2/
-├─ iceberg_backfill_migration_framework/   ← V2 NEW
+├─ iceberg_backfill_migration_framework/   ← V2 Iceberg migration framework
 │  ├─ scripts/
-│  │  ├─ engine_volumetric_router.py       ← Airflow DAG
-│  │  ├─ glue_iceberg_backfill_migration.py
-│  │  ├─ emr_iceberg_backfill_migration.py
-│  │  └─ iceberg_migration_utils.py
+│  │  ├─ engine_volumetric_router.py       ← Airflow DAG — cost-aware engine routing
+│  │  ├─ glue_iceberg_backfill_migration.py ← Glue backfill job — audit-free
+│  │  ├─ emr_iceberg_backfill_migration.py  ← EMR backfill job — 4x faster at scale
+│  │  └─ iceberg_migration_utils.py        ← Execution wrapper + timing + logging
 │  └─ README.md                            ← Framework deep-dive
 ├─ dbt/
 │  ├─ models/
-│  │  ├─ staging/                          ← Bronze layer
-│  │  │  ├─ stg_trip_data.sql
+│  │  ├─ staging/                          ← Bronze layer · Snowflake: view · Redshift: table
+│  │  │  ├─ stg_trip_data.sql              ← Incremental on Redshift · view on Snowflake
 │  │  │  ├─ stg_taxi_zone_lookup.sql
-│  │  │  └─ sources.yml
-│  │  ├─ intermediate/                     ← Silver layer
-│  │  │  ├─ int_trip_data_core.sql
-│  │  │  ├─ int_trip_data_quarantine.sql
-│  │  │  └─ int_trip_data_dq_duplicates.sql
-│  │  └─ marts/                            ← Gold layer
-│  │     ├─ fact_trip.sql
-│  │     ├─ dim_date.sql
-│  │     ├─ dim_taxi_zone.sql
-│  │     └─ dq_trip_issue_summary.sql
+│  │  │  ├─ stg_vendor.sql
+│  │  │  └─ sources.yml                    ← Multi-engine source routing via Jinja
+│  │  ├─ intermediate/                     ← Silver layer · incremental + DQ models
+│  │  │  ├─ int_trip_data_core.sql         ← Incremental · dedup · zone enrichment · surrogate key
+│  │  │  ├─ int_trip_data_quarantine.sql   ← Live DQ view · bad trip flagging
+│  │  │  └─ int_trip_data_dq_duplicates.sql ← Duplicate submission detection
+│  │  └─ marts/                            ← Gold layer · facts + dims + DQ summary
+│  │     ├─ fact_trip.sql                  ← Incremental · 35.6M records · derived metrics
+│  │     ├─ dim_date.sql                   ← Calendar spine · 2020–2030
+│  │     ├─ dim_taxi_zone.sql              ← 265 zones · borough + service zone
+│  │     ├─ dim_vendor.sql                 ← Current state vendor dim · refs snap_vendor
+│  │     └─ dq_trip_issue_summary.sql      ← Aggregated DQ signals by load date
 │  ├─ snapshots/                           ← SCD Type 2
-│  │  └─ snap_vendor.sql
+│  │  └─ snap_vendor.sql                   ← check strategy · vendor_name + status
 │  ├─ seeds/                               ← Reference data
 │  │  └─ vendor.csv
 │  ├─ macros/                              ← Reusable Jinja macros
-│  │  ├─ safe_divide.sql
-│  │  ├─ is_airport_trip.sql
-│  │  └─ cents_to_dollars.sql
-│  └─ packages.yml
-├─ analytics/
-├─ config/
+│  │  ├─ safe_divide.sql                   ← Division by zero protection
+│  │  ├─ is_airport_trip.sql               ← Airport LocationID detection
+│  │  └─ cents_to_dollars.sql              ← Fare normalization
+│  └─ packages.yml                         ← dbt_utils + dbt_expectations
 ├─ docs/
-│  ├─ arch_diagrams/
-│  ├─ benchmarks/
-│  ├─ metrics/
-│  └─ runbooks/
+│  ├─ architecture/                        ← Architecture diagrams
+│  ├─ benchmark/                           ← Snowflake vs Redshift benchmark series
+│  │  ├─ README.md                         ← Overview + headline results
+│  │  ├─ 01_parallel_architecture.md       ← How both engines connect to S3 Iceberg
+│  │  ├─ 02_materialization_decisions.md   ← Why staging differs + syntax fixes
+│  │  ├─ 03_benchmark_queries.md           ← 5 benchmark queries + setup
+│  │  ├─ 04_benchmark_results.md           ← Full results + analysis
+│  │  └─ 05_lessons_learned.md             ← What broke + tuning opportunities
+│  ├─ decisions/                           ← Design decisions log
+│  ├─ metrics/                             ← Dashboard screenshots
+│  └─ runbooks/                            ← Operational runbooks
 ├─ infrastructure/
 │  ├─ emr/
 │  ├─ glue/
@@ -252,16 +276,16 @@ ZenClarity-UrbanFlow-V2/
 │  └─ airflow-docker/
 └─ README.md
 ```
-
 ---
 
 ## 📈 dbt Modeling
+> Full medallion stack — staging → intermediate → marts → snapshots — confirmed working on **Snowflake + Iceberg** ✅ and **Redshift Spectrum** ✅
+> Single dbt codebase · two profile targets · 67/67 models + tests passing on both engines
 
-> Full medallion stack — staging → intermediate → marts — confirmed working on Snowflake + Iceberg ✅
-
-**Bronze — Staging (`STG_NYC_TAXI`)**
-- `stg_trip_data` — view · 1:1 with Iceberg source · cast + rename only · 8 tests passing
-- `stg_taxi_zone_lookup` — view · 1:1 with Iceberg source · cast + rename only
+**Bronze — Staging (`STG_NYC_TAXI` / `stg_nyc_taxi`)**
+- `stg_trip_data` — Snowflake: view · Redshift: incremental table · 1:1 with Iceberg source · 8 tests passing
+- `stg_taxi_zone_lookup` — Snowflake: view · Redshift: table · 1:1 with Iceberg source
+- `stg_vendor` — view · refs vendor seed · SCD Type 2 upstream source
 
 **Silver — Intermediate (`INT_NYC_TAXI`)**
 - `int_trip_data_core` — incremental table · quality filtered · deduped · zone enriched · surrogate keyed · 17/17 tests passing
@@ -311,11 +335,14 @@ ZenClarity-UrbanFlow-V2/
 - Cost-aware Airflow DAG with DynamoDB idempotency audit
 - Both engines benchmarked and confirmed working
 - Snowflake Iceberg integration — external volume + catalog integration
-- Full dbt medallion stack — staging + intermediate + marts on Snowflake + Iceberg
-- SCD Type 2 snapshot — `snap_vendor` · check strategy · 7/7 tests passing
+- Full dbt medallion stack — staging + intermediate + marts + snapshots on Snowflake + Iceberg
+- Redshift Spectrum integration — external schema · 41.1M records validated
+- Snowflake vs Redshift benchmark — 5 queries · single codebase · docs/benchmark/
+- SCD Type 2 snapshot — `snap_vendor` · check strategy · 7/7 tests passing on both engines
 - dbt packages — dbt_utils + dbt_expectations · 17/17 tests passing
 - dbt macros — safe_divide · is_airport_trip · cents_to_dollars
 - dbt exposures — Streamlit + QuickSight lineage confirmed in dbt docs
+- CI/CD — GitHub Actions · dbt test on PR · deploy on merge
 
 **V2 Phase 2 — In Progress 🔧**
 - Monthly delta ingestion Glue job re-pointed to Iceberg (replaces V1 `/processed/` path)
@@ -323,9 +350,8 @@ ZenClarity-UrbanFlow-V2/
 - Dashboard update — Streamlit + QuickSight on V2 mart layer
 
 **V2 Phase 3 — Next ⬡**
-- CI/CD — GitHub Actions (dbt test on PR · deploy on merge)
 - Benchmark: Snowflake Iceberg vs original external table
-- Benchmark: Redshift Spectrum vs Snowflake external table
+
 
 **V3 — Planned ○**
 - Reconciliation DAG — DynamoDB LANDED vs Iceberg partition drift detection
