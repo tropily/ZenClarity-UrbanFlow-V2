@@ -1,0 +1,68 @@
+version: "3.9"
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.8.1
+  environment:
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW__CORE__FERNET_KEY}
+    - AIRFLOW_UID=${AIRFLOW_UID}
+    - AWS_DEFAULT_REGION=us-east-1
+  user: "${AIRFLOW_UID}:0"
+  volumes:
+    - ../../dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - /home/viperuser/.aws:/home/airflow/.aws:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+
+  airflow-init:
+    <<: *airflow-common
+    ## entrypoint: /bin/bash
+    command: ["db", "init" ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  webserver:
+    <<: *airflow-common
+    ports:
+      - "8088:8080"
+    command: ["airflow", "webserver"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    restart: unless-stopped
+
+  scheduler:
+    <<: *airflow-common
+    command: ["airflow", "scheduler"]
+    restart: unless-stopped
+
+volumes:
+  postgres-db-volume:

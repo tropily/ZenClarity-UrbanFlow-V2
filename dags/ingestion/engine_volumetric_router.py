@@ -174,7 +174,7 @@ def run_preflight_checks(**kwargs):
     ti.xcom_push(key='d',            value=day   or "ALL")
 
     # ── Routing ──
-    if size_gb > 0.05:
+    if size_gb > 999:
         batch_id = f"emr#{slice_ref}#{run_short}"
         ti.xcom_push(key='batch_id', value=batch_id)
         ti.xcom_push(key='engine',   value='emr')
