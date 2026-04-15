@@ -353,10 +353,20 @@ ZenClarity-UrbanFlow-V2/
 - Benchmark: Snowflake Iceberg vs original external table
 
 
-**V3 - Planned ○**
-- Reconciliation DAG - DynamoDB LANDED vs Iceberg partition drift detection
-- Data quality layer - dbt-expectations + referential integrity tests
-- Predictive analytics - surge demand zones
+### V3 - Planned (Updated with Production Infrastructure) ○
+- Production Orchestration (MWAA): Transition from Local Docker to Amazon Managed Workflows for Apache Airflow (Serverless).
+
+- Implementation: S3-based DAG deployment + AWS IAM Identity Center integration (No Access Keys).
+
+- Infrastructure-as-Code (IaC): Terraform/CloudFormation manifests for EMR 7.7.0, Glue 4.0, and MWAA provisioning.
+
+- Reconciliation DAG: DynamoDB LANDED vs. Iceberg partition drift detection (Auto-healing logic).
+
+- Data Quality Layer: dbt-expectations + referential integrity tests + AWS Deequ for Spark-native profiling.
+
+- Operational Secrets: Migration of connection strings from Airflow UI to AWS Secrets Manager.
+
+- Predictive Analytics: SageMaker integration for surge demand zones based on the Iceberg Marts layer.
 
 ---
 
